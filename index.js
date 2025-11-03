@@ -68,9 +68,6 @@ const client = new Client({
 const VALID_SKILLS = ['Strength','Attack','Defence','Hitpoints','Ranged','Magic','Prayer'];
 const DAILY_CAP_XP = 1_000_000;
 const THEME_RED = 0xFF0000;
-const VALID_SKILLS = ['Strength', 'Attack', 'Defence', 'Hitpoints', 'Ranged', 'Magic', 'Prayer'];
-const DAILY_CAP_XP = 1_000_000;
-const THEME_RED = 0xff0000;
 
 // Pricing (gp per zeal)
 const PRICE_PER_TOKEN = {
@@ -131,10 +128,8 @@ function getXPForLevel(level) {
 ];
 
 // ───────── Helpers ─────────
-const fmtInt = n => n.toLocaleString('en-GB');
 
 function getXPForLevel(level) {
-  const lvl = Math.max(1, Math.min(99, level | 0));
   return OSRS_XP_1_TO_99[lvl];
 }
 function getLevel(xp) {
@@ -144,7 +139,6 @@ function getLevel(xp) {
   while (lo < hi) {
     const mid = ((lo + hi + 1) >> 1);
     if (OSRS_XP_1_TO_99[mid] <= xp) lo = mid; else hi = mid - 1;
-    const mid = (lo + hi + 1) >> 1;
     if (OSRS_XP_1_TO_99[mid] <= xp) lo = mid;
     else hi = mid - 1;
   }
@@ -215,7 +209,6 @@ function calcSoulWarsPlan(startXP, targetLevel, skill) {
   let bandStartLevel = getLevel(xp);
 
   const pushBandRow = (endLvl) => {
-  const pushBandRow = endLvl => {
     if (!currBandKey) return;
     rows.push({
       band: currBandKey,
@@ -226,11 +219,8 @@ function calcSoulWarsPlan(startXP, targetLevel, skill) {
   };
 
   while (xp < targetXP) {
-    const lvl = getLevel(xp);
-    const rate = getSWRatesForLevel(lvl, skill);
     if (rate <= 0) break;
 
-    const band = swRates.find(b => lvl >= b.from && lvl <= b.to);
     if (!band) break;
 
     const bandKey = `${band.from}-${band.to}`;
@@ -260,7 +250,6 @@ function calcSoulWarsPlan(startXP, targetLevel, skill) {
 }
 
 function calcPlanByDay(startXP, targetLevel, skill) {
-  const targetXP = getXPForLevel(targetLevel);
   let xp = startXP;
   let day = 1;
   let xpDay = 0;
@@ -279,9 +268,7 @@ function calcPlanByDay(startXP, targetLevel, skill) {
   };
 
   while (xp < targetXP) {
-    const lvl = getLevel(xp);
     if (lvl < 30) break;
-    const rate = getSWRatesForLevel(lvl, skill);
     if (rate <= 0) break;
 
     if (xpDay + rate > DAILY_CAP_XP) {
@@ -356,7 +343,6 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
   const lines = (view === 'band')
     ? buildBandLines(result.rows)
     : buildDayLines(calcPlanByDay(startXP, targetLevel, skill));
-  const lines = view === 'band' ? buildBandLines(result.rows) : buildDayLines(calcPlanByDay(startXP, targetLevel, skill));
 
   const embed = new EmbedBuilder()
     .setColor(THEME_RED)
@@ -385,7 +371,6 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
     .setThumbnail(WATERMARK_URL)
     .setFooter(baseFooter(i.user));
 
-  const fieldTitle = view === 'band' ? 'Plan by band' : 'Plan by day';
   embed.addFields(buildPlanField(fieldTitle, lines));
 
   embed.addFields({
@@ -451,18 +436,10 @@ function buildActionRow(ctx, activeView /* 'band' | 'day' */) {
   const dayBtn    = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dlBtn     = new ButtonBuilder().setCustomId(`${ctx}|dl`).setLabel('Breakdown').setStyle(ButtonStyle.Secondary);
   const payBtn    = new ButtonBuilder().setCustomId(`${ctx}|pay`).setLabel('Payment Info').setStyle(ButtonStyle.Success);
-  const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-  const dayBtn = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-  const dlBtn = new ButtonBuilder().setCustomId(`${ctx}|dl`).setLabel('Breakdown').setStyle(ButtonStyle.Secondary);
-  const payBtn = new ButtonBuilder().setCustomId(`${ctx}|pay`).setLabel('Payment Info').setStyle(ButtonStyle.Success);
   const ticketBtn = new ButtonBuilder().setCustomId(`${ctx}|ticket`).setLabel('Open Ticket').setStyle(ButtonStyle.Danger);
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn, dlBtn, payBtn, ticketBtn);
 }
 function buildToggleRow(ctx, activeView /* 'band' | 'day' */) {
-  const isBand = activeView === 'band';
-  const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-  const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-  const dayBtn = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn);
 }
 
@@ -508,8 +485,6 @@ async function closeTicketChannel(i) {
 }
 
 async function closeTicketById(i, channelId, openerId) {
-  const isOpener = i.user.id === openerId;
-  const hasSupport = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has?.(SUPPORT_ROLE_ID);
   if (!isOpener && !hasSupport) {
     return i.reply({ content: 'Only the opener or staff can close this ticket.', flags: MessageFlags.Ephemeral });
   }
@@ -588,7 +563,6 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
     .setCustomId(`ticketclose|${i.user.id}`)
     .setLabel('Close Ticket')
     .setStyle(ButtonStyle.Secondary);
-  const closeBtn = new ButtonBuilder().setCustomId(`ticketclose|${i.user.id}`).setLabel('Close Ticket').setStyle(ButtonStyle.Secondary);
   const closeRow = new ActionRowBuilder().addComponents(closeBtn);
   await channel.send({ embeds: [paymentEmbed], components: [closeRow] });
 
@@ -696,14 +670,12 @@ client.on('interactionCreate', async i => {
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect());
       const row4 = new ActionRowBuilder().addComponents(buildNextButton('xp', 'Strength', 'non10hp'));
 
-      const info = new EmbedBuilder()
         .setColor(THEME_RED)
         .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
         .setTitle('Soul Wars Calculator')
         .setDescription('Select **Mode**, **Skill**, and **Account Type**, then press **Next**.')
         .setThumbnail(WATERMARK_URL)
         .setFooter(baseFooter(i.user));
-      const banner = buildBannerEmbed();
 
       await safeReply(i, { embeds: [info, banner], components: [row1, row2, row3, row4] }, true);
       return;
@@ -725,10 +697,6 @@ client.on('interactionCreate', async i => {
         (acctComp?.options?.find?.(o => o.default)?.value) ||
         'non10hp';
 
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, selSkill, selAcct));
 
       await i.update({ components: [row1, row2, row3, row4] });
       return;
@@ -744,16 +712,10 @@ client.on('interactionCreate', async i => {
         (modeComp?.options?.find?.(o => o.default)?.value) ||
         'xp';
 
-      const acctComp = i.message.components[2].components[0];
-      const selAcct =
         (acctComp?.data?.options?.find?.(o => o.default)?.value) ||
         (acctComp?.options?.find?.(o => o.default)?.value) ||
         'non10hp';
 
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(skill));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, skill, selAcct));
 
       await i.update({ components: [row1, row2, row3, row4] });
       return;
@@ -763,22 +725,14 @@ client.on('interactionCreate', async i => {
     if (i.isStringSelectMenu() && i.customId === 'swcalc_acct') {
       const acctType = i.values[0];
 
-      const modeComp = i.message.components[0].components[0];
-      const selMode =
         (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
         (modeComp?.options?.find?.(o => o.default)?.value) ||
         'xp';
 
-      const skillComp = i.message.components[1].components[0];
-      const selSkill =
         (skillComp?.data?.options?.find?.(o => o.default)?.value) ||
         (skillComp?.options?.find?.(o => o.default)?.value) ||
         'Strength';
 
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, selSkill, acctType));
 
       await i.update({ components: [row1, row2, row3, row4] });
       return;
@@ -791,7 +745,6 @@ client.on('interactionCreate', async i => {
       const modal = new ModalBuilder()
         .setCustomId(`swcalc_modal|${mode}|${skill}|${acctType}`)
         .setTitle('Soul Wars Input');
-      const modal = new ModalBuilder().setCustomId(`swcalc_modal|${mode}|${skill}|${acctType}`).setTitle('Soul Wars Input');
 
       const startVal = new TextInputBuilder()
         .setCustomId('start_val')
@@ -816,10 +769,6 @@ client.on('interactionCreate', async i => {
       await i.showModal(modal.addComponents(new ActionRowBuilder().addComponents(startVal), new ActionRowBuilder().addComponents(target)));
 
       // soften the original controls
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode, true));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(skill, true));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType, true));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, skill, acctType, true));
       i.message.edit({ components: [row1, row2, row3, row4] }).catch(() => {});
       return;
     }
@@ -828,7 +777,6 @@ client.on('interactionCreate', async i => {
     if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
       const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
       const startRaw  = i.fields.getTextInputValue('start_val').trim();
-      const startRaw = i.fields.getTextInputValue('start_val').trim();
       const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
 
       const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
@@ -836,9 +784,6 @@ client.on('interactionCreate', async i => {
         return safeReply(i, { content: 'Target level must be 1–99.' }, true);
       }
 
-      const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
-      const acctType = (acctTypeSel === '10hp' || acctTypeSel === 'non10hp') ? acctTypeSel : 'non10hp';
-      const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
 
       let startXP;
       if (mode === 'xp') {
@@ -846,7 +791,6 @@ client.on('interactionCreate', async i => {
         if (!Number.isFinite(v) || v < 0) return safeReply(i, { content: 'Start XP must be a non-negative number.' }, true);
         startXP = v;
       } else if (mode === 'lvl') {
-        const v = parseInt(startRaw, 10);
         if (!Number.isFinite(v) || v < 1 || v > 99) return safeReply(i, { content: 'Start level must be 1–99.' }, true);
         startXP = getXPForLevel(v);
       } else {
@@ -861,25 +805,18 @@ client.on('interactionCreate', async i => {
     if (i.isButton() && i.customId.startsWith('swv3|')) {
       const parts = i.customId.split('|');
       const startXP = parseInt(parts[1], 10);
-      const targetLevel = parseInt(parts[2], 10);
-      const skill = parts[3];
-      const acctType = (parts[4] === '10hp' || parts[4] === 'non10hp') ? parts[4] : 'non10hp';
-      const acctType = parts[4] === '10hp' || parts[4] === 'non10hp' ? parts[4] : 'non10hp';
       const action = parts[5]; // 'band' | 'day' | 'dl' | 'pay' | 'ticket'
 
-      const result = calcSoulWarsPlan(startXP, targetLevel, skill);
       const inTicket = !!(i.channel?.name && /^sw-\d+$/i.test(i.channel.name));
 
       if (action === 'ticket') {
         try {
-          const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, 'band');
           const ctxTicket = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
           const rowToggle = buildToggleRow(ctxTicket, 'band');
 
           const ch = await openTicketChannel(i, [info], rowToggle);
 
           const createdEmbed = buildEphemeralCreatedEmbed(i, `<#${ch.id}>`);
-          const closeBtn = new ButtonBuilder()
             .setCustomId(`ticketclosebyid|${ch.id}|${i.user.id}`)
             .setLabel('Close Ticket')
             .setStyle(ButtonStyle.Secondary);
@@ -887,7 +824,6 @@ client.on('interactionCreate', async i => {
             .setLabel('Go to ticket')
             .setStyle(ButtonStyle.Link)
             .setURL(`https://discord.com/channels/${ch.guild.id}/${ch.id}`);
-          const row = new ActionRowBuilder().addComponents(linkBtn, closeBtn);
 
           await safeReply(i, { embeds: [createdEmbed], components: [row] }, true);
           return;
@@ -914,16 +850,10 @@ client.on('interactionCreate', async i => {
       }
 
       // Toggle view
-      const view = action === 'day' ? 'day' : 'band';
-      const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
-      const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
 
       if (inTicket) {
-        const row = buildToggleRow(ctx, view);
         await i.update({ embeds: [info], components: [row] });
       } else {
-        const banner = buildBannerEmbed();
-        const row = buildActionRow(ctx, view);
         await i.update({ embeds: [info, banner], components: [row] });
       }
       return;
