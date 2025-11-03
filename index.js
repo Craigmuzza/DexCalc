@@ -73,7 +73,6 @@ const THEME_RED = 0xFF0000;
 const PRICE_PER_TOKEN = {
   '10hp': 100_000,
   'non10hp': 80_000
-  non10hp: 80_000
 };
 
 // Soul Wars XP per zeal by band
