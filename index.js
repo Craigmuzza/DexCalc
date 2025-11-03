@@ -38,14 +38,11 @@ const {
 
 // ───────── Env / Config ─────────
 const TOKEN = process.env.DISCORD_TOKEN;
-<<<<<<< HEAD
 if (!TOKEN) { console.error('Missing DISCORD_TOKEN in .env / Render env'); process.exit(1); }
-=======
 if (!TOKEN) {
   console.error('Missing DISCORD_TOKEN in .env / Render env');
   process.exit(1);
 }
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 
 const DEPLOY_SLASH = process.env.DEPLOY_SLASH === '1';
 const GUILD_IDS = (process.env.GUILD_IDS || '')
@@ -54,21 +51,18 @@ const GUILD_IDS = (process.env.GUILD_IDS || '')
   .filter(Boolean);
 
 const TICKET_CATEGORY_ID = process.env.TICKET_CATEGORY_ID || null;
-<<<<<<< HEAD
 const SUPPORT_ROLE_ID    = process.env.SUPPORT_ROLE_ID || null;
 
 // ───────── Artwork / Links ─────────
 const LOGO_URL      = 'https://i.ibb.co/BKZGsfgw/PPGif.gif';               // top-left author icon
 const BANNER_URL    = 'https://i.ibb.co/7xwxnNpP/banner.gif';              // banner image
 const WATERMARK_URL = 'https://i.ibb.co/b59Hb5c0/PPwatermarkletters.png';  // top-right thumbnail
-=======
 const SUPPORT_ROLE_ID = process.env.SUPPORT_ROLE_ID || null;
 
 // ───────── Artwork / Links ─────────
 const LOGO_URL = 'https://i.ibb.co/BKZGsfgw/PPGif.gif'; // top-left author icon
 const BANNER_URL = 'https://i.ibb.co/7xwxnNpP/banner.gif'; // banner image
 const WATERMARK_URL = 'https://i.ibb.co/b59Hb5c0/PPwatermarkletters.png'; // top-right thumbnail
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 
 // ───────── Client ─────────
 const client = new Client({
@@ -77,37 +71,28 @@ const client = new Client({
 });
 
 // ───────── Domain Constants ─────────
-<<<<<<< HEAD
 const VALID_SKILLS = ['Strength','Attack','Defence','Hitpoints','Ranged','Magic','Prayer'];
 const DAILY_CAP_XP = 1_000_000;
 const THEME_RED = 0xFF0000;
-=======
 const VALID_SKILLS = ['Strength', 'Attack', 'Defence', 'Hitpoints', 'Ranged', 'Magic', 'Prayer'];
 const DAILY_CAP_XP = 1_000_000;
 const THEME_RED = 0xff0000;
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 
 // Pricing (gp per zeal)
 const PRICE_PER_TOKEN = {
   '10hp': 100_000,
-<<<<<<< HEAD
   'non10hp': 80_000
-=======
   non10hp: 80_000
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 };
 
 // Soul Wars XP per zeal by band
 const swRates = [
-<<<<<<< HEAD
   { from: 30, to: 34, meleeHp: 30,  mageRange: 27,  prayer: 14 },
   { from: 35, to: 42, meleeHp: 60,  mageRange: 54,  prayer: 28 },
   { from: 43, to: 48, meleeHp: 90,  mageRange: 81,  prayer: 42 },
-=======
   { from: 30, to: 34, meleeHp: 30, mageRange: 27, prayer: 14 },
   { from: 35, to: 42, meleeHp: 60, mageRange: 54, prayer: 28 },
   { from: 43, to: 48, meleeHp: 90, mageRange: 81, prayer: 42 },
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   { from: 49, to: 54, meleeHp: 120, mageRange: 108, prayer: 56 },
   { from: 55, to: 59, meleeHp: 150, mageRange: 135, prayer: 70 },
   { from: 60, to: 64, meleeHp: 180, mageRange: 162, prayer: 84 },
@@ -126,7 +111,6 @@ const swRates = [
 // OSRS XP Table (1→99; index = level)
 const OSRS_XP_1_TO_99 = [
   0,
-<<<<<<< HEAD
   0,83,174,276,388,512,650,801,969,1154,1358,1584,1833,2107,2411,2746,3115,3523,3973,4470,
   5018,5624,6291,7028,7842,8740,9730,10824,12031,13363,14833,16456,18247,20224,22406,24815,
   27473,30408,33648,37224,41171,45529,50339,55649,61512,67983,75127,83014,91721,101333,
@@ -142,7 +126,6 @@ const fmtInt = (n) => n.toLocaleString('en-GB');
 
 function getXPForLevel(level) {
   const lvl = Math.max(1, Math.min(99, level|0));
-=======
   0, 83, 174, 276, 388, 512, 650, 801, 969, 1154, 1358, 1584, 1833, 2107, 2411, 2746, 3115, 3523, 3973, 4470,
   5018, 5624, 6291, 7028, 7842, 8740, 9730, 10824, 12031, 13363, 14833, 16456, 18247, 20224, 22406, 24815,
   27473, 30408, 33648, 37224, 41171, 45529, 50339, 55649, 61512, 67983, 75127, 83014, 91721, 101333,
@@ -158,7 +141,6 @@ const fmtInt = n => n.toLocaleString('en-GB');
 
 function getXPForLevel(level) {
   const lvl = Math.max(1, Math.min(99, level | 0));
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   return OSRS_XP_1_TO_99[lvl];
 }
 function getLevel(xp) {
@@ -166,14 +148,11 @@ function getLevel(xp) {
   if (xp >= OSRS_XP_1_TO_99[99]) return 99;
   let lo = 1, hi = 99;
   while (lo < hi) {
-<<<<<<< HEAD
     const mid = ((lo + hi + 1) >> 1);
     if (OSRS_XP_1_TO_99[mid] <= xp) lo = mid; else hi = mid - 1;
-=======
     const mid = (lo + hi + 1) >> 1;
     if (OSRS_XP_1_TO_99[mid] <= xp) lo = mid;
     else hi = mid - 1;
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   }
   return lo;
 }
@@ -188,32 +167,26 @@ function getSWRatesForLevel(lvl, skill) {
 function skillTheme(skill) {
   const map = {
     Strength: { emoji: '🗡️' },
-<<<<<<< HEAD
     Attack:   { emoji: '⚔️' },
     Defence:  { emoji: '🛡️' },
     Hitpoints:{ emoji: '❤️' },
     Ranged:   { emoji: '🏹' },
     Magic:    { emoji: '🪄' },
     Prayer:   { emoji: '🙏' }
-=======
     Attack: { emoji: '⚔️' },
     Defence: { emoji: '🛡️' },
     Hitpoints: { emoji: '❤️' },
     Ranged: { emoji: '🏹' },
     Magic: { emoji: '🪄' },
     Prayer: { emoji: '🙏' }
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   };
   return map[skill] || { emoji: '⭐' };
 }
 function progressBar(current, target, width = 20) {
   const pct = Math.max(0, Math.min(1, current / target));
   const filled = Math.round(width * pct);
-<<<<<<< HEAD
   return `[${'█'.repeat(filled)}${'░'.repeat(width - filled)}] ${(pct*100).toFixed(1)}%`;
-=======
   return `[${'█'.repeat(filled)}${'░'.repeat(width - filled)}] ${(pct * 100).toFixed(1)}%`;
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 }
 function baseFooter(user) {
   return { text: `Requested by ${user.username} • ${new Date().toLocaleString('en-GB')}`, iconURL: LOGO_URL };
@@ -247,11 +220,8 @@ function calcSoulWarsPlan(startXP, targetLevel, skill) {
   let bandXpPerToken = 0;
   let bandStartLevel = getLevel(xp);
 
-<<<<<<< HEAD
   const pushBandRow = (endLvl) => {
-=======
   const pushBandRow = endLvl => {
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
     if (!currBandKey) return;
     rows.push({
       band: currBandKey,
@@ -389,19 +359,15 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
 
   const { rate, total } = gpCost(result.tokens, acctType);
   const bar = progressBar(startXP, result.targetXPAbs);
-<<<<<<< HEAD
   const lines = (view === 'band')
     ? buildBandLines(result.rows)
     : buildDayLines(calcPlanByDay(startXP, targetLevel, skill));
-=======
   const lines = view === 'band' ? buildBandLines(result.rows) : buildDayLines(calcPlanByDay(startXP, targetLevel, skill));
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 
   const embed = new EmbedBuilder()
     .setColor(THEME_RED)
     .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
     .setTitle(`${emoji} ${skill}: ${fmtInt(startXP)} XP → level ${targetLevel}`)
-<<<<<<< HEAD
     .setDescription([
       `📊 Current level: **${getLevel(startXP)}**`,
       `🎯 Target XP: **${fmtInt(result.targetXPAbs)}**`,
@@ -413,7 +379,6 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
     .setFooter(baseFooter(i.user));
 
   const fieldTitle = (view === 'band') ? 'Plan by band' : 'Plan by day';
-=======
     .setDescription(
       [
         `📊 Current level: **${getLevel(startXP)}**`,
@@ -427,16 +392,12 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
     .setFooter(baseFooter(i.user));
 
   const fieldTitle = view === 'band' ? 'Plan by band' : 'Plan by day';
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   embed.addFields(buildPlanField(fieldTitle, lines));
 
   embed.addFields({
     name: 'Pricing',
-<<<<<<< HEAD
     value: `**${accountLabel(acctType)}** — **${fmtInt(total)} gp** _(at ${fmtInt(rate)} gp/zeal)_`,
-=======
     value: `**${accountLabel(acctType)}** — **${fmtInt(total)} gp** _(at ${fmtInt(rate)} gp/zeal)_`
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   });
 
   return embed;
@@ -452,7 +413,6 @@ function buildPaymentEmbedPublic(i) {
     .setAuthor({ name: 'Payment Info', iconURL: LOGO_URL })
     .setTitle('💳 Payment Methods')
     .setThumbnail(WATERMARK_URL)
-<<<<<<< HEAD
     .setDescription([
       '**BTC (Bitcoin)**',
       '```',
@@ -465,7 +425,6 @@ function buildPaymentEmbedPublic(i) {
       '**GP - POH Tip Jar**',
       'To avoid imposters only discuss payments inside the TICKET — for GP payments, RSN + world for the POH will be provided'
     ].join('\n'))
-=======
     .setDescription(
       [
         '**BTC (Bitcoin)**',
@@ -480,7 +439,6 @@ function buildPaymentEmbedPublic(i) {
         'To avoid imposters only discuss payments inside the TICKET — for GP payments, RSN + world for the POH will be provided'
       ].join('\n')
     )
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
     .setFooter(baseFooter(i.user));
 }
 
@@ -495,28 +453,22 @@ function buildEphemeralCreatedEmbed(i, channelUrl) {
 // ───────── Buttons / Rows ─────────
 function buildActionRow(ctx, activeView /* 'band' | 'day' */) {
   const isBand = activeView === 'band';
-<<<<<<< HEAD
   const bandBtn   = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dayBtn    = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dlBtn     = new ButtonBuilder().setCustomId(`${ctx}|dl`).setLabel('Breakdown').setStyle(ButtonStyle.Secondary);
   const payBtn    = new ButtonBuilder().setCustomId(`${ctx}|pay`).setLabel('Payment Info').setStyle(ButtonStyle.Success);
-=======
   const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dayBtn = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dlBtn = new ButtonBuilder().setCustomId(`${ctx}|dl`).setLabel('Breakdown').setStyle(ButtonStyle.Secondary);
   const payBtn = new ButtonBuilder().setCustomId(`${ctx}|pay`).setLabel('Payment Info').setStyle(ButtonStyle.Success);
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   const ticketBtn = new ButtonBuilder().setCustomId(`${ctx}|ticket`).setLabel('Open Ticket').setStyle(ButtonStyle.Danger);
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn, dlBtn, payBtn, ticketBtn);
 }
 function buildToggleRow(ctx, activeView /* 'band' | 'day' */) {
   const isBand = activeView === 'band';
   const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-<<<<<<< HEAD
   const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-=======
   const dayBtn = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn);
 }
 
@@ -553,15 +505,12 @@ async function closeTicketChannel(i) {
     return i.reply({ content: 'Channel not found (already closed?).', flags: MessageFlags.Ephemeral });
   }
   await i.reply({ content: 'Closing ticket in 3 seconds…', flags: MessageFlags.Ephemeral });
-<<<<<<< HEAD
   setTimeout(async () => { try { await i.channel.delete('Ticket closed'); } catch {} }, 3000);
-=======
   setTimeout(async () => {
     try {
       await i.channel.delete('Ticket closed');
     } catch {}
   }, 3000);
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 }
 
 async function closeTicketById(i, channelId, openerId) {
@@ -580,12 +529,10 @@ async function closeTicketById(i, channelId, openerId) {
       }
     }
     await i.reply({ content: 'Closing ticket in 3 seconds…', flags: MessageFlags.Ephemeral });
-<<<<<<< HEAD
     setTimeout(async () => { try { await ch.delete('Ticket closed'); } catch {} }, 3000);
   } catch (err) {
     console.error('closeTicketById error:', err);
     try { await i.reply({ content: 'Failed to close ticket (permissions or missing channel).', flags: MessageFlags.Ephemeral }); } catch {}
-=======
     setTimeout(async () => {
       try {
         await ch.delete('Ticket closed');
@@ -596,7 +543,6 @@ async function closeTicketById(i, channelId, openerId) {
     try {
       await i.reply({ content: 'Failed to close ticket (permissions or missing channel).', flags: MessageFlags.Ephemeral });
     } catch {}
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   }
 }
 
@@ -610,12 +556,10 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
   const everyoneId = guild.roles.everyone.id;
   const overwrites = [
     { id: everyoneId, deny: ['ViewChannel'] },
-<<<<<<< HEAD
     { id: i.user.id, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'AttachFiles', 'EmbedLinks'] },
   ];
   if (SUPPORT_ROLE_ID) {
     overwrites.push({ id: SUPPORT_ROLE_ID, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'AttachFiles', 'EmbedLinks', 'ManageMessages'] });
-=======
     { id: i.user.id, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'AttachFiles', 'EmbedLinks'] }
   ];
   if (SUPPORT_ROLE_ID) {
@@ -623,7 +567,6 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
       id: SUPPORT_ROLE_ID,
       allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory', 'AttachFiles', 'EmbedLinks', 'ManageMessages']
     });
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   }
 
   const channel = await guild.channels.create({
@@ -638,26 +581,20 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
     await channel.send({
       content: SUPPORT_ROLE_ID ? `<@&${SUPPORT_ROLE_ID}>` : null,
       embeds: embedsToCopy,
-<<<<<<< HEAD
       components: componentsToCopy
         ? (Array.isArray(componentsToCopy) ? componentsToCopy : [componentsToCopy])
         : []
-=======
       components: componentsToCopy ? (Array.isArray(componentsToCopy) ? componentsToCopy : [componentsToCopy]) : []
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
     });
   }
 
   // 2) Payment Info (public, inside ticket) + Close Ticket
   const paymentEmbed = buildPaymentEmbedPublic(i);
-<<<<<<< HEAD
   const closeBtn = new ButtonBuilder()
     .setCustomId(`ticketclose|${i.user.id}`)
     .setLabel('Close Ticket')
     .setStyle(ButtonStyle.Secondary);
-=======
   const closeBtn = new ButtonBuilder().setCustomId(`ticketclose|${i.user.id}`).setLabel('Close Ticket').setStyle(ButtonStyle.Secondary);
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   const closeRow = new ActionRowBuilder().addComponents(closeBtn);
   await channel.send({ embeds: [paymentEmbed], components: [closeRow] });
 
@@ -683,11 +620,8 @@ function buildModeSelect(selected = 'xp', disabled = false) {
     .setPlaceholder('Select mode')
     .setDisabled(disabled)
     .addOptions(
-<<<<<<< HEAD
       { label: 'XP',  value: 'xp',  default: selected === 'xp'  },
-=======
       { label: 'XP', value: 'xp', default: selected === 'xp' },
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
       { label: 'LVL', value: 'lvl', default: selected === 'lvl' }
     );
 }
@@ -705,11 +639,8 @@ function buildAccountSelect(selected = 'non10hp', disabled = false) {
     .setDisabled(disabled)
     .addOptions(
       { label: 'Non-10 HP (80k gp/zeal)', value: 'non10hp', default: selected === 'non10hp' },
-<<<<<<< HEAD
       { label: '10 HP (100k gp/zeal)',    value: '10hp',    default: selected === '10hp' }
-=======
       { label: '10 HP (100k gp/zeal)', value: '10hp', default: selected === '10hp' }
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
     );
 }
 function buildNextButton(mode, skill, acctType, disabled = false) {
@@ -729,12 +660,10 @@ async function deploySlash() {
       .setDescription('Soul Wars calculator')
       .toJSON();
 
-<<<<<<< HEAD
     if (GUILD_IDS.length) {
       for (const gid of GUILD_IDS) {
         await rest.put(Routes.applicationGuildCommands(appId, gid), { body: [swCalc] });
         console.log(`Registered /swcalc in guild ${gid}`);
-=======
     console.log('DEPLOY_SLASH:', DEPLOY_SLASH, 'GUILD_IDS:', GUILD_IDS.join(',') || '(none)');
 
     if (GUILD_IDS.length) {
@@ -745,7 +674,6 @@ async function deploySlash() {
         } catch (e) {
           console.error(`Failed to register in guild ${gid}:`, e?.code || e?.status || e?.message || e);
         }
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
       }
     } else {
       await rest.put(Routes.applicationCommands(appId), { body: [swCalc] });
@@ -756,10 +684,7 @@ async function deploySlash() {
   }
 }
 
-<<<<<<< HEAD
-=======
 
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 // ───────── Events ─────────
 client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -767,11 +692,8 @@ client.once('clientReady', async () => {
   if (DEPLOY_SLASH) await deploySlash();
 });
 
-<<<<<<< HEAD
 client.on('interactionCreate', async (i) => {
-=======
 client.on('interactionCreate', async i => {
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   try {
     // /swcalc launcher
     if (i.isChatInputCommand() && i.commandName === 'swcalc') {
@@ -872,13 +794,10 @@ client.on('interactionCreate', async i => {
     if (i.isButton() && i.customId.startsWith('swcalc_next|')) {
       const [, mode, skill, acctType] = i.customId.split('|');
 
-<<<<<<< HEAD
       const modal = new ModalBuilder()
         .setCustomId(`swcalc_modal|${mode}|${skill}|${acctType}`)
         .setTitle('Soul Wars Input');
-=======
       const modal = new ModalBuilder().setCustomId(`swcalc_modal|${mode}|${skill}|${acctType}`).setTitle('Soul Wars Input');
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 
       const startVal = new TextInputBuilder()
         .setCustomId('start_val')
@@ -894,16 +813,13 @@ client.on('interactionCreate', async i => {
         .setStyle(TextInputStyle.Short)
         .setRequired(false);
 
-<<<<<<< HEAD
       await i.showModal(
         modal.addComponents(
           new ActionRowBuilder().addComponents(startVal),
           new ActionRowBuilder().addComponents(target)
         )
       );
-=======
       await i.showModal(modal.addComponents(new ActionRowBuilder().addComponents(startVal), new ActionRowBuilder().addComponents(target)));
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 
       // soften the original controls
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode, true));
@@ -917,11 +833,8 @@ client.on('interactionCreate', async i => {
     // Modal submit → calculation
     if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
       const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
-<<<<<<< HEAD
       const startRaw  = i.fields.getTextInputValue('start_val').trim();
-=======
       const startRaw = i.fields.getTextInputValue('start_val').trim();
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
       const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
 
       const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
@@ -930,11 +843,8 @@ client.on('interactionCreate', async i => {
       }
 
       const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
-<<<<<<< HEAD
       const acctType = (acctTypeSel === '10hp' || acctTypeSel === 'non10hp') ? acctTypeSel : 'non10hp';
-=======
       const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 
       let startXP;
       if (mode === 'xp') {
@@ -959,11 +869,8 @@ client.on('interactionCreate', async i => {
       const startXP = parseInt(parts[1], 10);
       const targetLevel = parseInt(parts[2], 10);
       const skill = parts[3];
-<<<<<<< HEAD
       const acctType = (parts[4] === '10hp' || parts[4] === 'non10hp') ? parts[4] : 'non10hp';
-=======
       const acctType = parts[4] === '10hp' || parts[4] === 'non10hp' ? parts[4] : 'non10hp';
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
       const action = parts[5]; // 'band' | 'day' | 'dl' | 'pay' | 'ticket'
 
       const result = calcSoulWarsPlan(startXP, targetLevel, skill);
@@ -1043,13 +950,10 @@ client.on('interactionCreate', async i => {
   } catch (err) {
     console.error('interactionCreate error:', err);
     const msg = `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}`;
-<<<<<<< HEAD
     try { await safeReply(i, { content: msg }, true); } catch (_) {}
-=======
     try {
       await safeReply(i, { content: msg }, true);
     } catch (_) {}
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
   }
 });
 
