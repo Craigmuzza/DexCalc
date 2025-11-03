@@ -5,14 +5,8 @@
 // - Ticket: copies info embed, ONLY Band/Day buttons, posts Payment Info (with Close Ticket)
 // - Ephemeral: confirmation with link + Close Ticket by ID
 // - Multi-guild slash deploy via GUILD_IDS (comma-separated). Falls back to global if empty.
-<<<<<<< HEAD
-
-require('dotenv').config();
-=======
 // - Web Service compatibility: tiny HTTP server binds PORT for Render (bots still work best as Background Workers)
-
 require('dotenv').config();
-
 // ───────── Tiny HTTP server for Render Web Services (safe no-op) ─────────
 const http = require('http');
 const PORT = process.env.PORT || 10000;
@@ -24,8 +18,6 @@ http
   .listen(PORT, () => {
     console.log(`Health server listening on port ${PORT}`);
   });
-
->>>>>>> e07a6be (Initial clean commit (history nuked; no secrets, no node_modules))
 const {
   Client,
   GatewayIntentBits,
