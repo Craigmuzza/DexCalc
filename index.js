@@ -9,6 +9,10 @@
 
 require('dotenv').config();
 
+const fs = require('fs');
+const path = require('path');
+const TICKET_COUNTER_FILE = path.join(__dirname, 'ticket_counter.json');
+
 // ───────── Tiny HTTP server for Render Web Services (safe no-op) ─────────
 const http = require('http');
 const PORT = process.env.PORT || 10000;
@@ -426,17 +430,32 @@ async function safeReply(i, payload, ephemeral = false) {
 
 // ───────── Ticket Helpers ─────────
 async function getNextTicketNumber(guild) {
-  const all = await guild.channels.fetch();
-  let max = 0;
-  all.forEach(ch => {
-    if (!ch || !ch.name) return;
-    const m = /^sw-(\d+)$/i.exec(ch.name.trim());
-    if (m) {
-      const n = parseInt(m[1], 10);
-      if (Number.isFinite(n) && n > max) max = n;
+  let counters = {};
+  
+  // Load existing counters from file
+  try {
+    if (fs.existsSync(TICKET_COUNTER_FILE)) {
+      const data = fs.readFileSync(TICKET_COUNTER_FILE, 'utf8');
+      counters = JSON.parse(data);
     }
-  });
-  return max + 1;
+  } catch (err) {
+    console.error('Error reading ticket counter:', err);
+  }
+  
+  // Get current counter for this guild (or start at 0)
+  const guildId = guild.id;
+  const currentCounter = counters[guildId] || 0;
+  const nextNumber = currentCounter + 1;
+  
+  // Save updated counter
+  counters[guildId] = nextNumber;
+  try {
+    fs.writeFileSync(TICKET_COUNTER_FILE, JSON.stringify(counters, null, 2));
+  } catch (err) {
+    console.error('Error saving ticket counter:', err);
+  }
+  
+  return nextNumber;
 }
 
 async function closeTicketChannel(i) {
@@ -594,6 +613,23 @@ async function deploySlash() {
       .toJSON();
 
     console.log('DEPLOY_SLASH:', DEPLOY_SLASH, 'GUILD_IDS:', GUILD_IDS.join(',') || '(none)');
+
+// temp code
+const oldGuildId = '1361036931156283654';
+try {
+  await rest.put(Routes.applicationGuildCommands(appId, oldGuildId), { body: [] });
+  console.log(`Removed commands from old guild ${oldGuildId}`);
+} catch (e) {
+  console.error(`Failed to remove from old guild:`, e);
+}
+
+// Remove global commands too
+try {
+  await rest.put(Routes.applicationCommands(appId), { body: [] });
+  console.log('Removed global commands');
+} catch (e) {
+  console.error('Failed to remove global commands:', e);
+}
 
     if (GUILD_IDS.length) {
       for (const gid of GUILD_IDS) {
