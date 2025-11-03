@@ -1,0 +1,5 @@
+﻿.env
+node_modules/
+.DS_Store
+DexCalc.git/
+npm-debug.log
