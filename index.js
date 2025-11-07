@@ -40,7 +40,6 @@ const {
   StringSelectMenuBuilder,
   ButtonBuilder,
   ButtonStyle,
-  MessageFlags,
   ChannelType
 } = require('discord.js');
 
@@ -76,23 +75,23 @@ const VALID_SKILLS = ['Strength', 'Attack', 'Defence', 'Hitpoints', 'Ranged', 'M
 const DAILY_CAP_XP = 1_000_000;
 const THEME_RED = 0xff0000;
 
-// Pricing (gp per zeal)
+// Pricing (gp per zeal) — UPDATED
 const PRICE_PER_TOKEN = {
-  '10hp': 100_000,
-  non10hp: 80_000
+  '10hp': 50_000,
+  non10hp: 40_000
 };
 
-// Soul Wars XP per zeal by band
+// Soul Wars XP per zeal by band (fixed 74–77 row + key name)
 const swRates = [
-  { from: 30, to: 34, meleeHp: 30, mageRange: 27, prayer: 14 },
-  { from: 35, to: 42, meleeHp: 60, mageRange: 54, prayer: 28 },
-  { from: 43, to: 48, meleeHp: 90, mageRange: 81, prayer: 42 },
+  { from: 30, to: 34, meleeHp: 30,  mageRange: 27,  prayer: 14 },
+  { from: 35, to: 42, meleeHp: 60,  mageRange: 54,  prayer: 28 },
+  { from: 43, to: 48, meleeHp: 90,  mageRange: 81,  prayer: 42 },
   { from: 49, to: 54, meleeHp: 120, mageRange: 108, prayer: 56 },
   { from: 55, to: 59, meleeHp: 150, mageRange: 135, prayer: 70 },
   { from: 60, to: 64, meleeHp: 180, mageRange: 162, prayer: 84 },
   { from: 65, to: 69, meleeHp: 210, mageRange: 189, prayer: 98 },
   { from: 70, to: 73, meleeHp: 240, mageRange: 216, prayer: 112 },
-  { from: 74, to: 77, meleeRange: 243, meleeHp: 270, prayer: 126 },
+  { from: 74, to: 77, meleeHp: 270, mageRange: 243, prayer: 126 }, // ← fixed
   { from: 78, to: 81, meleeHp: 300, mageRange: 270, prayer: 140 },
   { from: 82, to: 84, meleeHp: 330, mageRange: 297, prayer: 154 },
   { from: 85, to: 88, meleeHp: 360, mageRange: 324, prayer: 168 },
@@ -114,6 +113,23 @@ const OSRS_XP_1_TO_99 = [
   3972294, 4385776, 4842295, 5346332, 5902831, 6517253, 7195629, 7944614, 8771558, 9684577, 10692629,
   11805606, 13034431
 ];
+
+// Grind rate — for time estimate
+const ZEAL_PER_HOUR = 270;
+
+function hoursToDHMS(hours) {
+  const totalMinutes = Math.round(hours * 60);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const remAfterDays = totalMinutes - days * 24 * 60;
+  const hrs = Math.floor(remAfterDays / 60);
+  const mins = remAfterDays - hrs * 60;
+  return { days, hours: hrs, minutes: mins };
+}
+
+function formatDHMS(hours) {
+  const { days, hours: h, minutes: m } = hoursToDHMS(hours);
+  return `${days}d ${h}h ${m}m`;
+}
 
 // ───────── Helpers ─────────
 const fmtInt = n => n.toLocaleString('en-GB');
@@ -147,12 +163,12 @@ function getSWRatesForLevel(lvl, skill) {
 function skillTheme(skill) {
   const map = {
     Strength: { emoji: '🗡️' },
-    Attack: { emoji: '⚔️' },
-    Defence: { emoji: '🛡️' },
-    Hitpoints: { emoji: '❤️' },
-    Ranged: { emoji: '🏹' },
-    Magic: { emoji: '🪄' },
-    Prayer: { emoji: '🙏' }
+    Attack:   { emoji: '⚔️' },
+    Defence:  { emoji: '🛡️' },
+    Hitpoints:{ emoji: '❤️' },
+    Ranged:   { emoji: '🏹' },
+    Magic:    { emoji: '🪄' },
+    Prayer:   { emoji: '🙏' }
   };
   return map[skill] || { emoji: '⭐' };
 }
@@ -340,6 +356,7 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
   const { rate, total } = gpCost(result.tokens, acctType);
   const bar = progressBar(startXP, result.targetXPAbs);
   const lines = view === 'band' ? buildBandLines(result.rows) : buildDayLines(calcPlanByDay(startXP, targetLevel, skill));
+  const hours = result.ok ? (result.tokens / ZEAL_PER_HOUR) : 0;
 
   const embed = new EmbedBuilder()
     .setColor(THEME_RED)
@@ -351,6 +368,7 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
         `🎯 Target XP: **${fmtInt(result.targetXPAbs)}**`,
         `📈 Progress: ${bar}`,
         `🪙 Estimated zeal required: **${fmtInt(result.tokens)}**`,
+        `⏱️ Time to complete: **~${formatDHMS(hours)}**`,
         `📅 Daily redeem cap: ${fmtInt(DAILY_CAP_XP)} XP/day → about ${fmtInt(result.days)} day(s) to redeem`
       ].join('\n')
     )
@@ -407,9 +425,9 @@ function buildEphemeralCreatedEmbed(i, channelUrl) {
 function buildActionRow(ctx, activeView /* 'band' | 'day' */) {
   const isBand = activeView === 'band';
   const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-  const dayBtn = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-  const dlBtn = new ButtonBuilder().setCustomId(`${ctx}|dl`).setLabel('Breakdown').setStyle(ButtonStyle.Secondary);
-  const payBtn = new ButtonBuilder().setCustomId(`${ctx}|pay`).setLabel('Payment Info').setStyle(ButtonStyle.Success);
+  const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
+  const dlBtn   = new ButtonBuilder().setCustomId(`${ctx}|dl`).setLabel('Breakdown').setStyle(ButtonStyle.Secondary);
+  const payBtn  = new ButtonBuilder().setCustomId(`${ctx}|pay`).setLabel('Payment Info').setStyle(ButtonStyle.Success);
   const ticketBtn = new ButtonBuilder().setCustomId(`${ctx}|ticket`).setLabel('Open Ticket').setStyle(ButtonStyle.Danger);
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn, dlBtn, payBtn, ticketBtn);
 }
@@ -417,22 +435,14 @@ function buildActionRow(ctx, activeView /* 'band' | 'day' */) {
 function buildToggleRow(ctx, activeView /* 'band' | 'day' */) {
   const isBand = activeView === 'band';
   const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
-  const dayBtn = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
+  const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn);
-}
-
-// ───────── Safe Reply helper ─────────
-async function safeReply(i, payload, ephemeral = false) {
-  const withFlags = ephemeral ? { ...payload, flags: MessageFlags.Ephemeral } : payload;
-  if (i.deferred || i.replied) return i.followUp(withFlags);
-  return i.reply(withFlags);
 }
 
 // ───────── Ticket Helpers ─────────
 async function getNextTicketNumber(guild) {
   let counters = {};
-  
-  // Load existing counters from file
+
   try {
     if (fs.existsSync(TICKET_COUNTER_FILE)) {
       const data = fs.readFileSync(TICKET_COUNTER_FILE, 'utf8');
@@ -441,20 +451,18 @@ async function getNextTicketNumber(guild) {
   } catch (err) {
     console.error('Error reading ticket counter:', err);
   }
-  
-  // Get current counter for this guild (or start at 0)
+
   const guildId = guild.id;
   const currentCounter = counters[guildId] || 0;
   const nextNumber = currentCounter + 1;
-  
-  // Save updated counter
+
   counters[guildId] = nextNumber;
   try {
     fs.writeFileSync(TICKET_COUNTER_FILE, JSON.stringify(counters, null, 2));
   } catch (err) {
     console.error('Error saving ticket counter:', err);
   }
-  
+
   return nextNumber;
 }
 
@@ -463,16 +471,14 @@ async function closeTicketChannel(i) {
   const isOpener = i.user.id === openerId;
   const hasSupport = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has?.(SUPPORT_ROLE_ID);
   if (!isOpener && !hasSupport) {
-    return i.reply({ content: 'Only the opener or staff can close this ticket.', flags: MessageFlags.Ephemeral });
+    return i.reply({ content: 'Only the opener or staff can close this ticket.', ephemeral: true });
   }
   if (!i.channel) {
-    return i.reply({ content: 'Channel not found (already closed?).', flags: MessageFlags.Ephemeral });
+    return i.reply({ content: 'Channel not found (already closed?).', ephemeral: true });
   }
-  await i.reply({ content: 'Closing ticket in 3 seconds…', flags: MessageFlags.Ephemeral });
+  await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
   setTimeout(async () => {
-    try {
-      await i.channel.delete('Ticket closed');
-    } catch {}
+    try { await i.channel.delete('Ticket closed'); } catch {}
   }, 3000);
 }
 
@@ -480,7 +486,7 @@ async function closeTicketById(i, channelId, openerId) {
   const isOpener = i.user.id === openerId;
   const hasSupport = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has?.(SUPPORT_ROLE_ID);
   if (!isOpener && !hasSupport) {
-    return i.reply({ content: 'Only the opener or staff can close this ticket.', flags: MessageFlags.Ephemeral });
+    return i.reply({ content: 'Only the opener or staff can close this ticket.', ephemeral: true });
   }
   try {
     let ch = i.client.channels.cache.get(channelId);
@@ -488,19 +494,17 @@ async function closeTicketById(i, channelId, openerId) {
       try {
         ch = await i.client.channels.fetch(channelId);
       } catch {
-        return i.reply({ content: 'That ticket channel no longer exists (already closed or I can’t see it).', flags: MessageFlags.Ephemeral });
+        return i.reply({ content: 'That ticket channel no longer exists (already closed or I can’t see it).', ephemeral: true });
       }
     }
-    await i.reply({ content: 'Closing ticket in 3 seconds…', flags: MessageFlags.Ephemeral });
+    await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
     setTimeout(async () => {
-      try {
-        await ch.delete('Ticket closed');
-      } catch {}
+      try { await ch.delete('Ticket closed'); } catch {}
     }, 3000);
   } catch (err) {
     console.error('closeTicketById error:', err);
     try {
-      await i.reply({ content: 'Failed to close ticket (permissions or missing channel).', flags: MessageFlags.Ephemeral });
+      await i.reply({ content: 'Failed to close ticket (permissions or missing channel).', ephemeral: true });
     } catch {}
   }
 }
@@ -550,7 +554,7 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
 }
 
 // ───────── Main Flow ─────────
-async function handleSWCalculation(i, { startXP, targetLevel, skill, acctType }) {
+async function handleSWCalculationEmbed(i, { startXP, targetLevel, skill, acctType }) {
   const result = calcSoulWarsPlan(startXP, targetLevel, skill);
   const view = 'band';
   const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
@@ -558,43 +562,7 @@ async function handleSWCalculation(i, { startXP, targetLevel, skill, acctType })
 
   const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
   const row = buildActionRow(ctx, 'band');
-  await safeReply(i, { embeds: [info, banner], components: [row] });
-}
-
-// ───────── UI Builders ─────────
-function buildModeSelect(selected = 'xp', disabled = false) {
-  return new StringSelectMenuBuilder()
-    .setCustomId('swcalc_mode')
-    .setPlaceholder('Select mode')
-    .setDisabled(disabled)
-    .addOptions(
-      { label: 'XP', value: 'xp', default: selected === 'xp' },
-      { label: 'LVL', value: 'lvl', default: selected === 'lvl' }
-    );
-}
-
-function buildSkillSelect(selected = 'Strength', disabled = false) {
-  return new StringSelectMenuBuilder()
-    .setCustomId('swcalc_skill')
-    .setPlaceholder('Select skill')
-    .setDisabled(disabled)
-    .addOptions(...VALID_SKILLS.map(s => ({ label: s, value: s, default: s === selected })));
-}
-
-function buildAccountSelect(selected = 'non10hp', disabled = false) {
-  return new StringSelectMenuBuilder()
-    .setCustomId('swcalc_acct')
-    .setPlaceholder('Account type')
-    .setDisabled(disabled)
-    .addOptions(
-      { label: 'Non-10 HP (80k gp/zeal)', value: 'non10hp', default: selected === 'non10hp' },
-      { label: '10 HP (100k gp/zeal)', value: '10hp', default: selected === '10hp' }
-    );
-}
-
-function buildNextButton(mode, skill, acctType, disabled = false) {
-  const cid = `swcalc_next|${mode}|${skill}|${acctType}`;
-  return new ButtonBuilder().setCustomId(cid).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(disabled);
+  return { embeds: [info, banner], components: [row] };
 }
 
 // ───────── Slash Registration ─────────
@@ -614,22 +582,20 @@ async function deploySlash() {
 
     console.log('DEPLOY_SLASH:', DEPLOY_SLASH, 'GUILD_IDS:', GUILD_IDS.join(',') || '(none)');
 
-// temp code
-const oldGuildId = '1361036931156283654';
-try {
-  await rest.put(Routes.applicationGuildCommands(appId, oldGuildId), { body: [] });
-  console.log(`Removed commands from old guild ${oldGuildId}`);
-} catch (e) {
-  console.error(`Failed to remove from old guild:`, e);
-}
-
-// Remove global commands too
-try {
-  await rest.put(Routes.applicationCommands(appId), { body: [] });
-  console.log('Removed global commands');
-} catch (e) {
-  console.error('Failed to remove global commands:', e);
-}
+    // temp code: clear old guild + global
+    const oldGuildId = '1361036931156283654';
+    try {
+      await rest.put(Routes.applicationGuildCommands(appId, oldGuildId), { body: [] });
+      console.log(`Removed commands from old guild ${oldGuildId}`);
+    } catch (e) {
+      console.error(`Failed to remove from old guild:`, e);
+    }
+    try {
+      await rest.put(Routes.applicationCommands(appId), { body: [] });
+      console.log('Removed global commands');
+    } catch (e) {
+      console.error('Failed to remove global commands:', e);
+    }
 
     if (GUILD_IDS.length) {
       for (const gid of GUILD_IDS) {
@@ -650,7 +616,7 @@ try {
 }
 
 // ───────── Events ─────────
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log(`Logged in as ${client.user.tag}`);
   console.log(`App ID: ${client.application.id}`);
   if (DEPLOY_SLASH) await deploySlash();
@@ -660,6 +626,8 @@ client.on('interactionCreate', async i => {
   try {
     // /swcalc launcher
     if (i.isChatInputCommand() && i.commandName === 'swcalc') {
+      await i.deferReply({ ephemeral: true });
+
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect());
       const row2 = new ActionRowBuilder().addComponents(buildSkillSelect());
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect());
@@ -674,14 +642,15 @@ client.on('interactionCreate', async i => {
         .setFooter(baseFooter(i.user));
       const banner = buildBannerEmbed();
 
-      await safeReply(i, { embeds: [info, banner], components: [row1, row2, row3, row4] }, true);
+      await i.editReply({ embeds: [info, banner], components: [row1, row2, row3, row4] });
       return;
     }
 
     // Mode select
     if (i.isStringSelectMenu() && i.customId === 'swcalc_mode') {
-      const mode = i.values[0];
+      await i.deferUpdate();
 
+      const mode = i.values[0];
       const skillComp = i.message.components[1].components[0];
       const selSkill =
         (skillComp?.data?.options?.find?.(o => o.default)?.value) ||
@@ -699,14 +668,15 @@ client.on('interactionCreate', async i => {
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
       const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, selSkill, selAcct));
 
-      await i.update({ components: [row1, row2, row3, row4] });
+      await i.editReply({ components: [row1, row2, row3, row4] });
       return;
     }
 
     // Skill select
     if (i.isStringSelectMenu() && i.customId === 'swcalc_skill') {
-      const skill = i.values[0];
+      await i.deferUpdate();
 
+      const skill = i.values[0];
       const modeComp = i.message.components[0].components[0];
       const selMode =
         (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
@@ -724,14 +694,15 @@ client.on('interactionCreate', async i => {
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
       const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, skill, selAcct));
 
-      await i.update({ components: [row1, row2, row3, row4] });
+      await i.editReply({ components: [row1, row2, row3, row4] });
       return;
     }
 
     // Account type select
     if (i.isStringSelectMenu() && i.customId === 'swcalc_acct') {
-      const acctType = i.values[0];
+      await i.deferUpdate();
 
+      const acctType = i.values[0];
       const modeComp = i.message.components[0].components[0];
       const selMode =
         (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
@@ -749,7 +720,7 @@ client.on('interactionCreate', async i => {
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType));
       const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, selSkill, acctType));
 
-      await i.update({ components: [row1, row2, row3, row4] });
+      await i.editReply({ components: [row1, row2, row3, row4] });
       return;
     }
 
@@ -778,7 +749,7 @@ client.on('interactionCreate', async i => {
         new ActionRowBuilder().addComponents(target)
       ));
 
-      // soften the original controls
+      // soften the original controls (disable them)
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode, true));
       const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(skill, true));
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType, true));
@@ -787,7 +758,7 @@ client.on('interactionCreate', async i => {
       return;
     }
 
-    // Modal submit → calculation
+    // Modal submit → calculation (public reply)
     if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
       const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
       const startRaw = i.fields.getTextInputValue('start_val').trim();
@@ -795,7 +766,7 @@ client.on('interactionCreate', async i => {
 
       const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
       if (!Number.isFinite(targetLevel) || targetLevel < 1 || targetLevel > 99) {
-        return safeReply(i, { content: 'Target level must be 1–99.' }, true);
+        return i.reply({ content: 'Target level must be 1–99.', ephemeral: true });
       }
 
       const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
@@ -804,17 +775,19 @@ client.on('interactionCreate', async i => {
       let startXP;
       if (mode === 'xp') {
         const v = parseInt(startRaw, 10);
-        if (!Number.isFinite(v) || v < 0) return safeReply(i, { content: 'Start XP must be a non-negative number.' }, true);
+        if (!Number.isFinite(v) || v < 0) return i.reply({ content: 'Start XP must be a non-negative number.', ephemeral: true });
         startXP = v;
       } else if (mode === 'lvl') {
         const v = parseInt(startRaw, 10);
-        if (!Number.isFinite(v) || v < 1 || v > 99) return safeReply(i, { content: 'Start level must be 1–99.' }, true);
+        if (!Number.isFinite(v) || v < 1 || v > 99) return i.reply({ content: 'Start level must be 1–99.', ephemeral: true });
         startXP = getXPForLevel(v);
       } else {
-        return safeReply(i, { content: 'Invalid mode.' }, true);
+        return i.reply({ content: 'Invalid mode.', ephemeral: true });
       }
 
-      await handleSWCalculation(i, { startXP, targetLevel, skill, acctType });
+      await i.deferReply(); // public result (not ephemeral)
+      const payload = await handleSWCalculationEmbed(i, { startXP, targetLevel, skill, acctType });
+      await i.editReply(payload);
       return;
     }
 
@@ -832,10 +805,11 @@ client.on('interactionCreate', async i => {
 
       if (action === 'ticket') {
         try {
+          await i.deferReply({ ephemeral: true });
+
           const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, 'band');
           const ctxTicket = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
           const rowToggle = buildToggleRow(ctxTicket, 'band');
-
           const ch = await openTicketChannel(i, [info], rowToggle);
 
           const createdEmbed = buildEphemeralCreatedEmbed(i, `<#${ch.id}>`);
@@ -849,44 +823,51 @@ client.on('interactionCreate', async i => {
             .setURL(`https://discord.com/channels/${ch.guild.id}/${ch.id}`);
           const row = new ActionRowBuilder().addComponents(linkBtn, closeBtn);
 
-          await safeReply(i, { embeds: [createdEmbed], components: [row] }, true);
+          await i.editReply({ embeds: [createdEmbed], components: [row] });
           return;
         } catch (err) {
           console.error('openTicketChannel error:', err);
-          return safeReply(i, { content: 'Could not create ticket channel (check bot permissions & category ID).', flags: MessageFlags.Ephemeral });
+          try { await i.editReply({ content: 'Could not create ticket channel (check bot permissions & category ID).' }); } catch {}
+          return;
         }
       }
 
       if (action === 'dl') {
+        await i.deferReply({ ephemeral: true });
         if (result.ok && result.rows.length) {
           const files = buildTextFileAttachment(result.rows);
-          await safeReply(i, { files }, true);
+          await i.editReply({ files });
         } else {
-          await safeReply(i, { content: 'No breakdown available for this input.' }, true);
+          await i.editReply({ content: 'No breakdown available for this input.' });
         }
         return;
       }
 
       if (action === 'pay') {
+        await i.deferReply({ ephemeral: true });
         const payEmbed = buildPaymentEmbedPublic(i);
-        await safeReply(i, { embeds: [payEmbed] }, true); // ephemeral; public version exists in ticket
+        await i.editReply({ embeds: [payEmbed] });
         return;
       }
 
       // Toggle view
-      const view = action === 'day' ? 'day' : 'band';
-      const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
-      const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
+      if (action === 'band' || action === 'day') {
+        await i.deferUpdate();
 
-      if (inTicket) {
-        const row = buildToggleRow(ctx, view);
-        await i.update({ embeds: [info], components: [row] });
-      } else {
-        const banner = buildBannerEmbed();
-        const row = buildActionRow(ctx, view);
-        await i.update({ embeds: [info, banner], components: [row] });
+        const view = action === 'day' ? 'day' : 'band';
+        const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
+        const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
+
+        if (inTicket) {
+          const row = buildToggleRow(ctx, view);
+          await i.editReply({ embeds: [info], components: [row] });
+        } else {
+          const banner = buildBannerEmbed();
+          const row = buildActionRow(ctx, view);
+          await i.editReply({ embeds: [info, banner], components: [row] });
+        }
+        return;
       }
-      return;
     }
 
     // Ticket close (inside ticket)
@@ -903,12 +884,49 @@ client.on('interactionCreate', async i => {
     }
   } catch (err) {
     console.error('interactionCreate error:', err);
-    const msg = `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}`;
     try {
-      await safeReply(i, { content: msg }, true);
-    } catch (_) {}
+      if (i.isRepliable()) {
+        await i.reply({ content: `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}`, ephemeral: true });
+      }
+    } catch {}
   }
 });
+
+// ───────── UI Builders (at end for readability) ─────────
+function buildModeSelect(selected = 'xp', disabled = false) {
+  return new StringSelectMenuBuilder()
+    .setCustomId('swcalc_mode')
+    .setPlaceholder('Select mode')
+    .setDisabled(disabled)
+    .addOptions(
+      { label: 'XP',  value: 'xp',  default: selected === 'xp'  },
+      { label: 'LVL', value: 'lvl', default: selected === 'lvl' }
+    );
+}
+
+function buildSkillSelect(selected = 'Strength', disabled = false) {
+  return new StringSelectMenuBuilder()
+    .setCustomId('swcalc_skill')
+    .setPlaceholder('Select skill')
+    .setDisabled(disabled)
+    .addOptions(...VALID_SKILLS.map(s => ({ label: s, value: s, default: s === selected })));
+}
+
+function buildAccountSelect(selected = 'non10hp', disabled = false) {
+  return new StringSelectMenuBuilder()
+    .setCustomId('swcalc_acct')
+    .setPlaceholder('Account type')
+    .setDisabled(disabled)
+    .addOptions(
+      { label: 'Non-10 HP (40k gp/zeal)', value: 'non10hp', default: selected === 'non10hp' },
+      { label: '10 HP (50k gp/zeal)',     value: '10hp',    default: selected === '10hp' }
+    );
+}
+
+function buildNextButton(mode, skill, acctType, disabled = false) {
+  const cid = `swcalc_next|${mode}|${skill}|${acctType}`;
+  return new ButtonBuilder().setCustomId(cid).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(disabled);
+}
 
 // ───────── Start ─────────
 client.login(TOKEN).catch(err => {
