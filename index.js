@@ -13,6 +13,13 @@ const fs = require('fs');
 const path = require('path');
 const TICKET_COUNTER_FILE = path.join(__dirname, 'ticket_counter.json');
 const ACTIVE_TICKETS_FILE = path.join(__dirname, 'active_tickets.json');
+const SUPPORT_ROLE_ID = process.env.SUPPORT_ROLE_ID || null;
+
+const ALLOWED_CLOSE_ROLES = [
+  '1251990189337743381',
+  '1238423254637613086',
+  '1238405570491318293'
+];
 
 // ───────── Tiny HTTP server for Render Web Services (safe no-op) ─────────
 const http = require('http');
@@ -504,14 +511,22 @@ async function getNextTicketNumber(guild) {
 async function closeTicketChannel(i) {
   const [_, openerId] = i.customId.split('|');
   const isOpener = i.user.id === openerId;
-  const hasSupport = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has?.(SUPPORT_ROLE_ID);
-  if (!isOpener && !hasSupport) {
+
+  // Check if user has the Env Support Role OR any of the hardcoded allowed roles
+  const hasEnvRole = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has(SUPPORT_ROLE_ID);
+  const hasAllowedRole = ALLOWED_CLOSE_ROLES.some(roleId => i.member?.roles?.cache?.has(roleId));
+
+  if (!isOpener && !hasEnvRole && !hasAllowedRole) {
     return i.reply({ content: 'Only the opener or staff can close this ticket.', ephemeral: true });
   }
+
   if (!i.channel) {
     return i.reply({ content: 'Channel not found (already closed?).', ephemeral: true });
   }
+  
+  // Respond immediately so user knows it's working
   await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
+  
   setTimeout(async () => {
     try { await i.channel.delete('Ticket closed'); } catch {}
   }, 3000);
@@ -519,10 +534,15 @@ async function closeTicketChannel(i) {
 
 async function closeTicketById(i, channelId, openerId) {
   const isOpener = i.user.id === openerId;
-  const hasSupport = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has?.(SUPPORT_ROLE_ID);
-  if (!isOpener && !hasSupport) {
+
+  // Check if user has the Env Support Role OR any of the hardcoded allowed roles
+  const hasEnvRole = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has(SUPPORT_ROLE_ID);
+  const hasAllowedRole = ALLOWED_CLOSE_ROLES.some(roleId => i.member?.roles?.cache?.has(roleId));
+
+  if (!isOpener && !hasEnvRole && !hasAllowedRole) {
     return i.reply({ content: 'Only the opener or staff can close this ticket.', ephemeral: true });
   }
+
   try {
     let ch = i.client.channels.cache.get(channelId);
     if (!ch) {
@@ -532,7 +552,10 @@ async function closeTicketById(i, channelId, openerId) {
         return i.reply({ content: 'That ticket channel no longer exists (already closed or I can’t see it).', ephemeral: true });
       }
     }
+    
+    // Respond immediately
     await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
+    
     setTimeout(async () => {
       try { await ch.delete('Ticket closed'); } catch {}
     }, 3000);
