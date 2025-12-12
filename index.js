@@ -12,6 +12,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const TICKET_COUNTER_FILE = path.join(__dirname, 'ticket_counter.json');
+const ACTIVE_TICKETS_FILE = path.join(__dirname, 'active_tickets.json');
 
 // ───────── Tiny HTTP server for Render Web Services (safe no-op) ─────────
 const http = require('http');
@@ -439,6 +440,40 @@ function buildToggleRow(ctx, activeView /* 'band' | 'day' */) {
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn);
 }
 
+// ───────── Active Ticket Helpers ─────────
+function loadActiveTickets() {
+  try {
+    if (fs.existsSync(ACTIVE_TICKETS_FILE)) {
+      return JSON.parse(fs.readFileSync(ACTIVE_TICKETS_FILE, 'utf8'));
+    }
+  } catch (e) { console.error('Error loading active tickets:', e); }
+  return {};
+}
+
+function saveActiveTickets(data) {
+  try {
+    fs.writeFileSync(ACTIVE_TICKETS_FILE, JSON.stringify(data, null, 2));
+  } catch (e) { console.error('Error saving active tickets:', e); }
+}
+
+function addActiveTicket(guildId, userId, channelId) {
+  const data = loadActiveTickets();
+  data[`${guildId}-${userId}`] = channelId;
+  saveActiveTickets(data);
+}
+
+function removeActiveTicketByChannelId(channelId) {
+  const data = loadActiveTickets();
+  let found = false;
+  for (const key in data) {
+    if (data[key] === channelId) {
+      delete data[key];
+      found = true;
+    }
+  }
+  if (found) saveActiveTickets(data);
+}
+
 // ───────── Ticket Helpers ─────────
 async function getNextTicketNumber(guild) {
   let counters = {};
@@ -803,14 +838,42 @@ client.on('interactionCreate', async i => {
       const result = calcSoulWarsPlan(startXP, targetLevel, skill);
       const inTicket = !!(i.channel?.name && /^sw-\d+$/i.test(i.channel.name));
 
-      if (action === 'ticket') {
+if (action === 'ticket') {
         try {
+          // 1. CHECK FOR EXISTING TICKET
+          const guildId = i.guild.id;
+          const userId = i.user.id;
+          const activeTickets = loadActiveTickets();
+          const existingChannelId = activeTickets[`${guildId}-${userId}`];
+
+          if (existingChannelId) {
+            // Check if the channel actually still exists in Discord cache/fetch
+            const existingChannel = i.guild.channels.cache.get(existingChannelId);
+            
+            if (existingChannel) {
+              // Ticket exists and is valid -> Block creation
+              await i.reply({ 
+                content: `You already have an open ticket: ${existingChannel}`, 
+                ephemeral: true 
+              });
+              return;
+            } else {
+              // Ticket ID is in our file, but channel is gone (zombie data) -> Remove it and proceed
+              removeActiveTicketByChannelId(existingChannelId);
+            }
+          }
+
+          // 2. CREATE TICKET (Existing logic)
           await i.deferReply({ ephemeral: true });
 
           const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, 'band');
           const ctxTicket = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
           const rowToggle = buildToggleRow(ctxTicket, 'band');
+          
           const ch = await openTicketChannel(i, [info], rowToggle);
+
+          // 3. SAVE NEW ACTIVE TICKET
+          addActiveTicket(guildId, userId, ch.id);
 
           const createdEmbed = buildEphemeralCreatedEmbed(i, `<#${ch.id}>`);
           const closeBtn = new ButtonBuilder()
@@ -927,6 +990,13 @@ function buildNextButton(mode, skill, acctType, disabled = false) {
   const cid = `swcalc_next|${mode}|${skill}|${acctType}`;
   return new ButtonBuilder().setCustomId(cid).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(disabled);
 }
+
+// Handle manual channel deletion to free up the user
+client.on('channelDelete', channel => {
+  if (channel.guild) {
+    removeActiveTicketByChannelId(channel.id);
+  }
+});
 
 // ───────── Start ─────────
 client.login(TOKEN).catch(err => {
