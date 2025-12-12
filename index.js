@@ -65,7 +65,6 @@ const GUILD_IDS = (process.env.GUILD_IDS || '')
   .filter(Boolean);
 
 const TICKET_CATEGORY_ID = process.env.TICKET_CATEGORY_ID || null;
-const SUPPORT_ROLE_ID = process.env.SUPPORT_ROLE_ID || null;
 
 // ───────── Artwork / Links ─────────
 const LOGO_URL = 'https://i.ibb.co/BKZGsfgw/PPGif.gif'; // top-left author icon
