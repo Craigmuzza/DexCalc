@@ -1024,8 +1024,24 @@ client.on('channelDelete', channel => {
 console.log('TOKEN exists:', !!TOKEN);
 console.log('TOKEN length:', TOKEN ? TOKEN.length : 0);
 
+// Catch client-level errors
+client.on('error', err => {
+  console.error('Client error:', err);
+});
+
+client.on('debug', info => {
+  console.log('Debug:', info);
+});
+
+// Timeout check
+setTimeout(() => {
+  if (!client.isReady()) {
+    console.error('Login timed out after 30 seconds - bot never connected');
+  }
+}, 30000);
+
 client.login(TOKEN)
-  .then(() => console.log('Login successful'))
+  .then(() => console.log('Login promise resolved'))
   .catch(err => {
     console.error('Login failed:', err);
   });
