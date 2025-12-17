@@ -709,6 +709,8 @@ client.once('clientReady', async () => {
 });
 
 client.on('interactionCreate', async i => {
+  console.log(`[${Date.now()}] Received interaction: ${i.id} | Type: ${i.type} | Command: ${i.commandName || 'N/A'}`);
+  
   try {
     // /swcalc launcher - DIRECT REPLY (no defer)
     if (i.isChatInputCommand() && i.commandName === 'swcalc') {
