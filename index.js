@@ -544,7 +544,7 @@ async function closeTicketById(i, channelId, openerId) {
       try {
         ch = await i.client.channels.fetch(channelId);
       } catch {
-        return i.reply({ content: 'That ticket channel no longer exists (already closed or I can't see it).', ephemeral: true });
+        return i.reply({ content: 'That ticket channel no longer exists (already closed or I cant see it).', ephemeral: true });
       }
     }
     
