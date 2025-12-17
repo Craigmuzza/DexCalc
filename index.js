@@ -5,7 +5,6 @@
 // - Ticket: copies info embed, ONLY Band/Day buttons, posts Payment Info (with Close Ticket)
 // - Ephemeral: confirmation with link + Close Ticket by ID
 // - Multi-guild slash deploy via GUILD_IDS (comma-separated). Falls back to global if empty.
-// - Web Service compatibility: tiny HTTP server binds PORT for Render (bots still work best as Background Workers)
 
 require('dotenv').config();
 
@@ -21,7 +20,7 @@ const ALLOWED_CLOSE_ROLES = [
   '1238405570491318293'
 ];
 
-// ───────── Tiny HTTP server for Render Web Services (safe no-op) ─────────
+// ───────── Tiny HTTP server for Render (safe no-op for Background Worker) ─────────
 const http = require('http');
 const PORT = process.env.PORT || 10000;
 http
@@ -67,9 +66,9 @@ const GUILD_IDS = (process.env.GUILD_IDS || '')
 const TICKET_CATEGORY_ID = process.env.TICKET_CATEGORY_ID || null;
 
 // ───────── Artwork / Links ─────────
-const LOGO_URL = 'https://i.ibb.co/BKZGsfgw/PPGif.gif'; // top-left author icon
-const BANNER_URL = 'https://i.ibb.co/7xwxnNpP/banner.gif'; // banner image
-const WATERMARK_URL = 'https://i.ibb.co/b59Hb5c0/PPwatermarkletters.png'; // top-right thumbnail
+const LOGO_URL = 'https://i.ibb.co/BKZGsfgw/PPGif.gif';
+const BANNER_URL = 'https://i.ibb.co/7xwxnNpP/banner.gif';
+const WATERMARK_URL = 'https://i.ibb.co/b59Hb5c0/PPwatermarkletters.png';
 
 // ───────── Client ─────────
 const client = new Client({
@@ -82,13 +81,13 @@ const VALID_SKILLS = ['Strength', 'Attack', 'Defence', 'Hitpoints', 'Ranged', 'M
 const DAILY_CAP_XP = 1_000_000;
 const THEME_RED = 0xff0000;
 
-// Pricing (gp per zeal) — UPDATED
+// Pricing (gp per zeal)
 const PRICE_PER_TOKEN = {
   '10hp': 50_000,
   non10hp: 40_000
 };
 
-// Soul Wars XP per zeal by band (fixed 74–77 row + key name)
+// Soul Wars XP per zeal by band
 const swRates = [
   { from: 30, to: 34, meleeHp: 30,  mageRange: 27,  prayer: 14 },
   { from: 35, to: 42, meleeHp: 60,  mageRange: 54,  prayer: 28 },
@@ -98,7 +97,7 @@ const swRates = [
   { from: 60, to: 64, meleeHp: 180, mageRange: 162, prayer: 84 },
   { from: 65, to: 69, meleeHp: 210, mageRange: 189, prayer: 98 },
   { from: 70, to: 73, meleeHp: 240, mageRange: 216, prayer: 112 },
-  { from: 74, to: 77, meleeHp: 270, mageRange: 243, prayer: 126 }, // ← fixed
+  { from: 74, to: 77, meleeHp: 270, mageRange: 243, prayer: 126 },
   { from: 78, to: 81, meleeHp: 300, mageRange: 270, prayer: 140 },
   { from: 82, to: 84, meleeHp: 330, mageRange: 297, prayer: 154 },
   { from: 85, to: 88, meleeHp: 360, mageRange: 324, prayer: 168 },
@@ -214,7 +213,7 @@ function calcSoulWarsPlan(startXP, targetLevel, skill) {
   let xp = startXP;
   let tokens = 0;
 
-  const rows = []; // { band, xpPerToken, tokens, levels }
+  const rows = [];
   let currBandKey = null;
   let bandTokens = 0;
   let bandXpPerToken = 0;
@@ -429,7 +428,7 @@ function buildEphemeralCreatedEmbed(i, channelUrl) {
 }
 
 // ───────── Buttons / Rows ─────────
-function buildActionRow(ctx, activeView /* 'band' | 'day' */) {
+function buildActionRow(ctx, activeView) {
   const isBand = activeView === 'band';
   const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
@@ -439,7 +438,7 @@ function buildActionRow(ctx, activeView /* 'band' | 'day' */) {
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn, dlBtn, payBtn, ticketBtn);
 }
 
-function buildToggleRow(ctx, activeView /* 'band' | 'day' */) {
+function buildToggleRow(ctx, activeView) {
   const isBand = activeView === 'band';
   const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
@@ -511,7 +510,6 @@ async function closeTicketChannel(i) {
   const [_, openerId] = i.customId.split('|');
   const isOpener = i.user.id === openerId;
 
-  // Check if user has the Env Support Role OR any of the hardcoded allowed roles
   const hasEnvRole = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has(SUPPORT_ROLE_ID);
   const hasAllowedRole = ALLOWED_CLOSE_ROLES.some(roleId => i.member?.roles?.cache?.has(roleId));
 
@@ -523,7 +521,6 @@ async function closeTicketChannel(i) {
     return i.reply({ content: 'Channel not found (already closed?).', ephemeral: true });
   }
   
-  // Respond immediately so user knows it's working
   await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
   
   setTimeout(async () => {
@@ -534,7 +531,6 @@ async function closeTicketChannel(i) {
 async function closeTicketById(i, channelId, openerId) {
   const isOpener = i.user.id === openerId;
 
-  // Check if user has the Env Support Role OR any of the hardcoded allowed roles
   const hasEnvRole = SUPPORT_ROLE_ID && i.member?.roles?.cache?.has(SUPPORT_ROLE_ID);
   const hasAllowedRole = ALLOWED_CLOSE_ROLES.some(roleId => i.member?.roles?.cache?.has(roleId));
 
@@ -548,11 +544,10 @@ async function closeTicketById(i, channelId, openerId) {
       try {
         ch = await i.client.channels.fetch(channelId);
       } catch {
-        return i.reply({ content: 'That ticket channel no longer exists (already closed or I can’t see it).', ephemeral: true });
+        return i.reply({ content: 'That ticket channel no longer exists (already closed or I can't see it).', ephemeral: true });
       }
     }
     
-    // Respond immediately
     await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
     
     setTimeout(async () => {
@@ -566,7 +561,7 @@ async function closeTicketById(i, channelId, openerId) {
   }
 }
 
-async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, componentsToCopy /* row or array */) {
+async function openTicketChannel(i, embedsToCopy, componentsToCopy) {
   const guild = i.guild;
   if (!guild) throw new Error('No guild on interaction');
 
@@ -592,7 +587,6 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
     permissionOverwrites: overwrites
   });
 
-  // 1) Info (no banner) + ONLY Band/Day buttons
   if (embedsToCopy && embedsToCopy.length) {
     await channel.send({
       content: SUPPORT_ROLE_ID ? `<@&${SUPPORT_ROLE_ID}>` : undefined,
@@ -601,7 +595,6 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
     });
   }
 
-  // 2) Payment Info (public, inside ticket) + Close Ticket
   const paymentEmbed = buildPaymentEmbedPublic(i);
   const closeBtn = new ButtonBuilder().setCustomId(`ticketclose|${i.user.id}`).setLabel('Close Ticket').setStyle(ButtonStyle.Secondary);
   const closeRow = new ActionRowBuilder().addComponents(closeBtn);
@@ -611,7 +604,7 @@ async function openTicketChannel(i, embedsToCopy /* array of EmbedBuilder */, co
 }
 
 // ───────── Main Flow ─────────
-async function handleSWCalculationEmbed(i, { startXP, targetLevel, skill, acctType }) {
+function buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType }) {
   const result = calcSoulWarsPlan(startXP, targetLevel, skill);
   const view = 'band';
   const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
@@ -639,7 +632,7 @@ async function deploySlash() {
 
     console.log('DEPLOY_SLASH:', DEPLOY_SLASH, 'GUILD_IDS:', GUILD_IDS.join(',') || '(none)');
 
-    // temp code: clear old guild + global
+    // Clear old guild + global commands
     const oldGuildId = '1361036931156283654';
     try {
       await rest.put(Routes.applicationGuildCommands(appId, oldGuildId), { body: [] });
@@ -672,312 +665,7 @@ async function deploySlash() {
   }
 }
 
-// ───────── Events ─────────
-client.once('clientReady', async () => {
-  console.log(`Logged in as ${client.user.tag}`);
-  console.log(`App ID: ${client.application.id}`);
-  if (DEPLOY_SLASH) await deploySlash();
-});
-
-client.on('interactionCreate', async i => {
-  try {
-    // /swcalc launcher
-    if (i.isChatInputCommand() && i.commandName === 'swcalc') {
-      await i.deferReply({ ephemeral: true });
-
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect());
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect());
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect());
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton('xp', 'Strength', 'non10hp'));
-
-      const info = new EmbedBuilder()
-        .setColor(THEME_RED)
-        .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
-        .setTitle('Soul Wars Calculator')
-        .setDescription('Select **Mode**, **Skill**, and **Account Type**, then press **Next**.')
-        .setThumbnail(WATERMARK_URL)
-        .setFooter(baseFooter(i.user));
-      const banner = buildBannerEmbed();
-
-      await i.editReply({ embeds: [info, banner], components: [row1, row2, row3, row4] });
-      return;
-    }
-
-    // Mode select
-    if (i.isStringSelectMenu() && i.customId === 'swcalc_mode') {
-      await i.deferUpdate();
-
-      const mode = i.values[0];
-      const skillComp = i.message.components[1].components[0];
-      const selSkill =
-        (skillComp?.data?.options?.find?.(o => o.default)?.value) ||
-        (skillComp?.options?.find?.(o => o.default)?.value) ||
-        'Strength';
-
-      const acctComp = i.message.components[2].components[0];
-      const selAcct =
-        (acctComp?.data?.options?.find?.(o => o.default)?.value) ||
-        (acctComp?.options?.find?.(o => o.default)?.value) ||
-        'non10hp';
-
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, selSkill, selAcct));
-
-      await i.editReply({ components: [row1, row2, row3, row4] });
-      return;
-    }
-
-    // Skill select
-    if (i.isStringSelectMenu() && i.customId === 'swcalc_skill') {
-      await i.deferUpdate();
-
-      const skill = i.values[0];
-      const modeComp = i.message.components[0].components[0];
-      const selMode =
-        (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
-        (modeComp?.options?.find?.(o => o.default)?.value) ||
-        'xp';
-
-      const acctComp = i.message.components[2].components[0];
-      const selAcct =
-        (acctComp?.data?.options?.find?.(o => o.default)?.value) ||
-        (acctComp?.options?.find?.(o => o.default)?.value) ||
-        'non10hp';
-
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(skill));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, skill, selAcct));
-
-      await i.editReply({ components: [row1, row2, row3, row4] });
-      return;
-    }
-
-    // Account type select
-    if (i.isStringSelectMenu() && i.customId === 'swcalc_acct') {
-      await i.deferUpdate();
-
-      const acctType = i.values[0];
-      const modeComp = i.message.components[0].components[0];
-      const selMode =
-        (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
-        (modeComp?.options?.find?.(o => o.default)?.value) ||
-        'xp';
-
-      const skillComp = i.message.components[1].components[0];
-      const selSkill =
-        (skillComp?.data?.options?.find?.(o => o.default)?.value) ||
-        (skillComp?.options?.find?.(o => o.default)?.value) ||
-        'Strength';
-
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, selSkill, acctType));
-
-      await i.editReply({ components: [row1, row2, row3, row4] });
-      return;
-    }
-
-    // Next → modal
-    if (i.isButton() && i.customId.startsWith('swcalc_next|')) {
-      const [, mode, skill, acctType] = i.customId.split('|');
-
-      const modal = new ModalBuilder().setCustomId(`swcalc_modal|${mode}|${skill}|${acctType}`).setTitle('Soul Wars Input');
-
-      const startVal = new TextInputBuilder()
-        .setCustomId('start_val')
-        .setLabel(mode === 'xp' ? 'Start XP' : 'Start Level')
-        .setPlaceholder(mode === 'xp' ? 'e.g. 100000' : 'e.g. 30')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
-
-      const target = new TextInputBuilder()
-        .setCustomId('target_level')
-        .setLabel('Target level (default 99)')
-        .setPlaceholder('e.g. 89  or blank → 99')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false);
-
-      await i.showModal(modal.addComponents(
-        new ActionRowBuilder().addComponents(startVal),
-        new ActionRowBuilder().addComponents(target)
-      ));
-
-      // soften the original controls (disable them)
-      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode, true));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(skill, true));
-      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType, true));
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, skill, acctType, true));
-      i.message.edit({ components: [row1, row2, row3, row4] }).catch(() => {});
-      return;
-    }
-
-    // Modal submit → calculation (public reply)
-    if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
-      const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
-      const startRaw = i.fields.getTextInputValue('start_val').trim();
-      const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
-
-      const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
-      if (!Number.isFinite(targetLevel) || targetLevel < 1 || targetLevel > 99) {
-        return i.reply({ content: 'Target level must be 1–99.', ephemeral: true });
-      }
-
-      const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
-      const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
-
-      let startXP;
-      if (mode === 'xp') {
-        const v = parseInt(startRaw, 10);
-        if (!Number.isFinite(v) || v < 0) return i.reply({ content: 'Start XP must be a non-negative number.', ephemeral: true });
-        startXP = v;
-      } else if (mode === 'lvl') {
-        const v = parseInt(startRaw, 10);
-        if (!Number.isFinite(v) || v < 1 || v > 99) return i.reply({ content: 'Start level must be 1–99.', ephemeral: true });
-        startXP = getXPForLevel(v);
-      } else {
-        return i.reply({ content: 'Invalid mode.', ephemeral: true });
-      }
-
-      await i.deferReply(); // public result (not ephemeral)
-      const payload = await handleSWCalculationEmbed(i, { startXP, targetLevel, skill, acctType });
-      await i.editReply(payload);
-      return;
-    }
-
-    // Buttons on embeds
-    if (i.isButton() && i.customId.startsWith('swv3|')) {
-      const parts = i.customId.split('|');
-      const startXP = parseInt(parts[1], 10);
-      const targetLevel = parseInt(parts[2], 10);
-      const skill = parts[3];
-      const acctType = parts[4] === '10hp' || parts[4] === 'non10hp' ? parts[4] : 'non10hp';
-      const action = parts[5]; // 'band' | 'day' | 'dl' | 'pay' | 'ticket'
-
-      const result = calcSoulWarsPlan(startXP, targetLevel, skill);
-      const inTicket = !!(i.channel?.name && /^sw-\d+$/i.test(i.channel.name));
-
-if (action === 'ticket') {
-        try {
-          // 1. CHECK FOR EXISTING TICKET
-          const guildId = i.guild.id;
-          const userId = i.user.id;
-          const activeTickets = loadActiveTickets();
-          const existingChannelId = activeTickets[`${guildId}-${userId}`];
-
-          if (existingChannelId) {
-            // Check if the channel actually still exists in Discord cache/fetch
-            const existingChannel = i.guild.channels.cache.get(existingChannelId);
-            
-            if (existingChannel) {
-              // Ticket exists and is valid -> Block creation
-              await i.reply({ 
-                content: `You already have an open ticket: ${existingChannel}`, 
-                ephemeral: true 
-              });
-              return;
-            } else {
-              // Ticket ID is in our file, but channel is gone (zombie data) -> Remove it and proceed
-              removeActiveTicketByChannelId(existingChannelId);
-            }
-          }
-
-          // 2. CREATE TICKET (Existing logic)
-          await i.deferReply({ ephemeral: true });
-
-          const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, 'band');
-          const ctxTicket = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
-          const rowToggle = buildToggleRow(ctxTicket, 'band');
-          
-          const ch = await openTicketChannel(i, [info], rowToggle);
-
-          // 3. SAVE NEW ACTIVE TICKET
-          addActiveTicket(guildId, userId, ch.id);
-
-          const createdEmbed = buildEphemeralCreatedEmbed(i, `<#${ch.id}>`);
-          const closeBtn = new ButtonBuilder()
-            .setCustomId(`ticketclosebyid|${ch.id}|${i.user.id}`)
-            .setLabel('Close Ticket')
-            .setStyle(ButtonStyle.Secondary);
-          const linkBtn = new ButtonBuilder()
-            .setLabel('Go to ticket')
-            .setStyle(ButtonStyle.Link)
-            .setURL(`https://discord.com/channels/${ch.guild.id}/${ch.id}`);
-          const row = new ActionRowBuilder().addComponents(linkBtn, closeBtn);
-
-          await i.editReply({ embeds: [createdEmbed], components: [row] });
-          return;
-        } catch (err) {
-          console.error('openTicketChannel error:', err);
-          try { await i.editReply({ content: 'Could not create ticket channel (check bot permissions & category ID).' }); } catch {}
-          return;
-        }
-      }
-
-      if (action === 'dl') {
-        await i.deferReply({ ephemeral: true });
-        if (result.ok && result.rows.length) {
-          const files = buildTextFileAttachment(result.rows);
-          await i.editReply({ files });
-        } else {
-          await i.editReply({ content: 'No breakdown available for this input.' });
-        }
-        return;
-      }
-
-      if (action === 'pay') {
-        await i.deferReply({ ephemeral: true });
-        const payEmbed = buildPaymentEmbedPublic(i);
-        await i.editReply({ embeds: [payEmbed] });
-        return;
-      }
-
-      // Toggle view
-      if (action === 'band' || action === 'day') {
-        await i.deferUpdate();
-
-        const view = action === 'day' ? 'day' : 'band';
-        const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
-        const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
-
-        if (inTicket) {
-          const row = buildToggleRow(ctx, view);
-          await i.editReply({ embeds: [info], components: [row] });
-        } else {
-          const banner = buildBannerEmbed();
-          const row = buildActionRow(ctx, view);
-          await i.editReply({ embeds: [info, banner], components: [row] });
-        }
-        return;
-      }
-    }
-
-    // Ticket close (inside ticket)
-    if (i.isButton() && i.customId.startsWith('ticketclose|')) {
-      await closeTicketChannel(i);
-      return;
-    }
-
-    // Ephemeral close by id
-    if (i.isButton() && i.customId.startsWith('ticketclosebyid|')) {
-      const [, channelId, openerId] = i.customId.split('|');
-      await closeTicketById(i, channelId, openerId);
-      return;
-    }
-  } catch (err) {
-    console.error('interactionCreate error:', err);
-    try {
-      if (i.isRepliable()) {
-        await i.reply({ content: `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}`, ephemeral: true });
-      }
-    } catch {}
-  }
-});
-
-// ───────── UI Builders (at end for readability) ─────────
+// ───────── UI Builders ─────────
 function buildModeSelect(selected = 'xp', disabled = false) {
   return new StringSelectMenuBuilder()
     .setCustomId('swcalc_mode')
@@ -1013,6 +701,293 @@ function buildNextButton(mode, skill, acctType, disabled = false) {
   return new ButtonBuilder().setCustomId(cid).setLabel('Next').setStyle(ButtonStyle.Primary).setDisabled(disabled);
 }
 
+// ───────── Events ─────────
+client.once('clientReady', async () => {
+  console.log(`Logged in as ${client.user.tag}`);
+  console.log(`App ID: ${client.application.id}`);
+  if (DEPLOY_SLASH) await deploySlash();
+});
+
+client.on('interactionCreate', async i => {
+  try {
+    // /swcalc launcher - DIRECT REPLY (no defer)
+    if (i.isChatInputCommand() && i.commandName === 'swcalc') {
+      const row1 = new ActionRowBuilder().addComponents(buildModeSelect());
+      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect());
+      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect());
+      const row4 = new ActionRowBuilder().addComponents(buildNextButton('xp', 'Strength', 'non10hp'));
+
+      const info = new EmbedBuilder()
+        .setColor(THEME_RED)
+        .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
+        .setTitle('Soul Wars Calculator')
+        .setDescription('Select **Mode**, **Skill**, and **Account Type**, then press **Next**.')
+        .setThumbnail(WATERMARK_URL)
+        .setFooter(baseFooter(i.user));
+      const banner = buildBannerEmbed();
+
+      await i.reply({ embeds: [info, banner], components: [row1, row2, row3, row4], ephemeral: true });
+      return;
+    }
+
+    // Mode select - DIRECT UPDATE (no defer)
+    if (i.isStringSelectMenu() && i.customId === 'swcalc_mode') {
+      const mode = i.values[0];
+      const skillComp = i.message.components[1].components[0];
+      const selSkill =
+        (skillComp?.data?.options?.find?.(o => o.default)?.value) ||
+        (skillComp?.options?.find?.(o => o.default)?.value) ||
+        'Strength';
+
+      const acctComp = i.message.components[2].components[0];
+      const selAcct =
+        (acctComp?.data?.options?.find?.(o => o.default)?.value) ||
+        (acctComp?.options?.find?.(o => o.default)?.value) ||
+        'non10hp';
+
+      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode));
+      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
+      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
+      const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, selSkill, selAcct));
+
+      await i.update({ components: [row1, row2, row3, row4] });
+      return;
+    }
+
+    // Skill select - DIRECT UPDATE (no defer)
+    if (i.isStringSelectMenu() && i.customId === 'swcalc_skill') {
+      const skill = i.values[0];
+      const modeComp = i.message.components[0].components[0];
+      const selMode =
+        (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
+        (modeComp?.options?.find?.(o => o.default)?.value) ||
+        'xp';
+
+      const acctComp = i.message.components[2].components[0];
+      const selAcct =
+        (acctComp?.data?.options?.find?.(o => o.default)?.value) ||
+        (acctComp?.options?.find?.(o => o.default)?.value) ||
+        'non10hp';
+
+      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
+      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(skill));
+      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
+      const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, skill, selAcct));
+
+      await i.update({ components: [row1, row2, row3, row4] });
+      return;
+    }
+
+    // Account type select - DIRECT UPDATE (no defer)
+    if (i.isStringSelectMenu() && i.customId === 'swcalc_acct') {
+      const acctType = i.values[0];
+      const modeComp = i.message.components[0].components[0];
+      const selMode =
+        (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
+        (modeComp?.options?.find?.(o => o.default)?.value) ||
+        'xp';
+
+      const skillComp = i.message.components[1].components[0];
+      const selSkill =
+        (skillComp?.data?.options?.find?.(o => o.default)?.value) ||
+        (skillComp?.options?.find?.(o => o.default)?.value) ||
+        'Strength';
+
+      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
+      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
+      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType));
+      const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, selSkill, acctType));
+
+      await i.update({ components: [row1, row2, row3, row4] });
+      return;
+    }
+
+    // Next → modal (showModal is instant, no defer needed)
+    if (i.isButton() && i.customId.startsWith('swcalc_next|')) {
+      const [, mode, skill, acctType] = i.customId.split('|');
+
+      const modal = new ModalBuilder().setCustomId(`swcalc_modal|${mode}|${skill}|${acctType}`).setTitle('Soul Wars Input');
+
+      const startVal = new TextInputBuilder()
+        .setCustomId('start_val')
+        .setLabel(mode === 'xp' ? 'Start XP' : 'Start Level')
+        .setPlaceholder(mode === 'xp' ? 'e.g. 100000' : 'e.g. 30')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true);
+
+      const target = new TextInputBuilder()
+        .setCustomId('target_level')
+        .setLabel('Target level (default 99)')
+        .setPlaceholder('e.g. 89  or blank → 99')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false);
+
+      await i.showModal(modal.addComponents(
+        new ActionRowBuilder().addComponents(startVal),
+        new ActionRowBuilder().addComponents(target)
+      ));
+
+      // Disable controls after modal opens (fire and forget)
+      const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode, true));
+      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(skill, true));
+      const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType, true));
+      const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, skill, acctType, true));
+      i.message.edit({ components: [row1, row2, row3, row4] }).catch(() => {});
+      return;
+    }
+
+    // Modal submit → calculation - DIRECT REPLY (no defer)
+    if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
+      const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
+      const startRaw = i.fields.getTextInputValue('start_val').trim();
+      const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
+
+      const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
+      if (!Number.isFinite(targetLevel) || targetLevel < 1 || targetLevel > 99) {
+        return i.reply({ content: 'Target level must be 1–99.', ephemeral: true });
+      }
+
+      const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
+      const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
+
+      let startXP;
+      if (mode === 'xp') {
+        const v = parseInt(startRaw, 10);
+        if (!Number.isFinite(v) || v < 0) return i.reply({ content: 'Start XP must be a non-negative number.', ephemeral: true });
+        startXP = v;
+      } else if (mode === 'lvl') {
+        const v = parseInt(startRaw, 10);
+        if (!Number.isFinite(v) || v < 1 || v > 99) return i.reply({ content: 'Start level must be 1–99.', ephemeral: true });
+        startXP = getXPForLevel(v);
+      } else {
+        return i.reply({ content: 'Invalid mode.', ephemeral: true });
+      }
+
+      const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType });
+      await i.reply(payload);
+      return;
+    }
+
+    // Buttons on embeds
+    if (i.isButton() && i.customId.startsWith('swv3|')) {
+      const parts = i.customId.split('|');
+      const startXP = parseInt(parts[1], 10);
+      const targetLevel = parseInt(parts[2], 10);
+      const skill = parts[3];
+      const acctType = parts[4] === '10hp' || parts[4] === 'non10hp' ? parts[4] : 'non10hp';
+      const action = parts[5];
+
+      const result = calcSoulWarsPlan(startXP, targetLevel, skill);
+      const inTicket = !!(i.channel?.name && /^sw-\d+$/i.test(i.channel.name));
+
+      if (action === 'ticket') {
+        try {
+          const guildId = i.guild.id;
+          const userId = i.user.id;
+          const activeTickets = loadActiveTickets();
+          const existingChannelId = activeTickets[`${guildId}-${userId}`];
+
+          if (existingChannelId) {
+            const existingChannel = i.guild.channels.cache.get(existingChannelId);
+            
+            if (existingChannel) {
+              await i.reply({ 
+                content: `You already have an open ticket: ${existingChannel}`, 
+                ephemeral: true 
+              });
+              return;
+            } else {
+              removeActiveTicketByChannelId(existingChannelId);
+            }
+          }
+
+          // Defer here because ticket creation takes time
+          await i.deferReply({ ephemeral: true });
+
+          const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, 'band');
+          const ctxTicket = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
+          const rowToggle = buildToggleRow(ctxTicket, 'band');
+          
+          const ch = await openTicketChannel(i, [info], rowToggle);
+
+          addActiveTicket(guildId, userId, ch.id);
+
+          const createdEmbed = buildEphemeralCreatedEmbed(i, `<#${ch.id}>`);
+          const closeBtn = new ButtonBuilder()
+            .setCustomId(`ticketclosebyid|${ch.id}|${i.user.id}`)
+            .setLabel('Close Ticket')
+            .setStyle(ButtonStyle.Secondary);
+          const linkBtn = new ButtonBuilder()
+            .setLabel('Go to ticket')
+            .setStyle(ButtonStyle.Link)
+            .setURL(`https://discord.com/channels/${ch.guild.id}/${ch.id}`);
+          const row = new ActionRowBuilder().addComponents(linkBtn, closeBtn);
+
+          await i.editReply({ embeds: [createdEmbed], components: [row] });
+          return;
+        } catch (err) {
+          console.error('openTicketChannel error:', err);
+          try { await i.editReply({ content: 'Could not create ticket channel (check bot permissions & category ID).' }); } catch {}
+          return;
+        }
+      }
+
+      if (action === 'dl') {
+        if (result.ok && result.rows.length) {
+          const files = buildTextFileAttachment(result.rows);
+          await i.reply({ files, ephemeral: true });
+        } else {
+          await i.reply({ content: 'No breakdown available for this input.', ephemeral: true });
+        }
+        return;
+      }
+
+      if (action === 'pay') {
+        const payEmbed = buildPaymentEmbedPublic(i);
+        await i.reply({ embeds: [payEmbed], ephemeral: true });
+        return;
+      }
+
+      // Toggle view - DIRECT UPDATE (no defer)
+      if (action === 'band' || action === 'day') {
+        const view = action === 'day' ? 'day' : 'band';
+        const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
+        const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
+
+        if (inTicket) {
+          const row = buildToggleRow(ctx, view);
+          await i.update({ embeds: [info], components: [row] });
+        } else {
+          const banner = buildBannerEmbed();
+          const row = buildActionRow(ctx, view);
+          await i.update({ embeds: [info, banner], components: [row] });
+        }
+        return;
+      }
+    }
+
+    // Ticket close (inside ticket)
+    if (i.isButton() && i.customId.startsWith('ticketclose|')) {
+      await closeTicketChannel(i);
+      return;
+    }
+
+    // Ephemeral close by id
+    if (i.isButton() && i.customId.startsWith('ticketclosebyid|')) {
+      const [, channelId, openerId] = i.customId.split('|');
+      await closeTicketById(i, channelId, openerId);
+      return;
+    }
+  } catch (err) {
+    console.error('interactionCreate error:', err);
+    try {
+      if (i.isRepliable() && !i.replied && !i.deferred) {
+        await i.reply({ content: `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}`, ephemeral: true });
+      }
+    } catch {}
+  }
+});
+
 // Handle manual channel deletion to free up the user
 client.on('channelDelete', channel => {
   if (channel.guild) {
@@ -1021,25 +996,6 @@ client.on('channelDelete', channel => {
 });
 
 // ───────── Start ─────────
-console.log('TOKEN exists:', !!TOKEN);
-console.log('TOKEN length:', TOKEN ? TOKEN.length : 0);
-
-// Catch client-level errors
-client.on('error', err => {
-  console.error('Client error:', err);
-});
-
-client.on('debug', info => {
-  console.log('Debug:', info);
-});
-
-// Timeout check
-setTimeout(() => {
-  if (!client.isReady()) {
-    console.error('Login timed out after 30 seconds - bot never connected');
-  }
-}, 30000);
-
 client.login(TOKEN)
   .then(() => console.log('Login promise resolved'))
   .catch(err => {
