@@ -1021,6 +1021,11 @@ client.on('channelDelete', channel => {
 });
 
 // ───────── Start ─────────
-client.login(TOKEN).catch(err => {
-  console.error('Login failed:', err);
-});
+console.log('TOKEN exists:', !!TOKEN);
+console.log('TOKEN length:', TOKEN ? TOKEN.length : 0);
+
+client.login(TOKEN)
+  .then(() => console.log('Login successful'))
+  .catch(err => {
+    console.error('Login failed:', err);
+  });
