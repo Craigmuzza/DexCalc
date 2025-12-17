@@ -838,37 +838,43 @@ client.on('interactionCreate', async i => {
       return;
     }
 
-    // Modal submit → calculation - DIRECT REPLY (no defer)
-    if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
-      const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
-      const startRaw = i.fields.getTextInputValue('start_val').trim();
-      const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
+	// Modal submit → calculation - DIRECT REPLY (no defer)
+	if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
+	  console.log(`[${Date.now()}] Modal submit START - ${i.id}`);
+	  
+	  const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
+	  const startRaw = i.fields.getTextInputValue('start_val').trim();
+	  const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
 
-      const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
-      if (!Number.isFinite(targetLevel) || targetLevel < 1 || targetLevel > 99) {
-        return i.reply({ content: 'Target level must be 1–99.', ephemeral: true });
-      }
+	  const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
+	  if (!Number.isFinite(targetLevel) || targetLevel < 1 || targetLevel > 99) {
+		return i.reply({ content: 'Target level must be 1–99.', ephemeral: true });
+	  }
 
-      const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
-      const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
+	  const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
+	  const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
 
-      let startXP;
-      if (mode === 'xp') {
-        const v = parseInt(startRaw, 10);
-        if (!Number.isFinite(v) || v < 0) return i.reply({ content: 'Start XP must be a non-negative number.', ephemeral: true });
-        startXP = v;
-      } else if (mode === 'lvl') {
-        const v = parseInt(startRaw, 10);
-        if (!Number.isFinite(v) || v < 1 || v > 99) return i.reply({ content: 'Start level must be 1–99.', ephemeral: true });
-        startXP = getXPForLevel(v);
-      } else {
-        return i.reply({ content: 'Invalid mode.', ephemeral: true });
-      }
+	  let startXP;
+	  if (mode === 'xp') {
+		const v = parseInt(startRaw, 10);
+		if (!Number.isFinite(v) || v < 0) return i.reply({ content: 'Start XP must be a non-negative number.', ephemeral: true });
+		startXP = v;
+	  } else if (mode === 'lvl') {
+		const v = parseInt(startRaw, 10);
+		if (!Number.isFinite(v) || v < 1 || v > 99) return i.reply({ content: 'Start level must be 1–99.', ephemeral: true });
+		startXP = getXPForLevel(v);
+	  } else {
+		return i.reply({ content: 'Invalid mode.', ephemeral: true });
+	  }
 
-      const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType });
-      await i.reply(payload);
-      return;
-    }
+	  console.log(`[${Date.now()}] Building payload - ${i.id}`);
+	  const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType });
+	  
+	  console.log(`[${Date.now()}] About to reply - ${i.id}`);
+	  await i.reply(payload);
+	  console.log(`[${Date.now()}] Reply sent - ${i.id}`);
+	  return;
+	}
 
     // Buttons on embeds
     if (i.isButton() && i.customId.startsWith('swv3|')) {
