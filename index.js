@@ -5,6 +5,7 @@
 // - Ticket: copies info embed, ONLY Band/Day buttons, posts Payment Info (with Close Ticket)
 // - Ephemeral: confirmation with link + Close Ticket by ID
 // - Multi-guild slash deploy via GUILD_IDS (comma-separated). Falls back to global if empty.
+// - ALL interactions now use defer → edit pattern to survive Render cold starts
 
 require('dotenv').config();
 
@@ -514,14 +515,17 @@ async function closeTicketChannel(i) {
   const hasAllowedRole = ALLOWED_CLOSE_ROLES.some(roleId => i.member?.roles?.cache?.has(roleId));
 
   if (!isOpener && !hasEnvRole && !hasAllowedRole) {
-    return i.reply({ content: 'Only the opener or staff can close this ticket.', ephemeral: true });
+    await i.deferReply({ ephemeral: true });
+    return i.editReply({ content: 'Only the opener or staff can close this ticket.' });
   }
 
   if (!i.channel) {
-    return i.reply({ content: 'Channel not found (already closed?).', ephemeral: true });
+    await i.deferReply({ ephemeral: true });
+    return i.editReply({ content: 'Channel not found (already closed?).' });
   }
   
-  await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
+  await i.deferReply({ ephemeral: true });
+  await i.editReply({ content: 'Closing ticket in 3 seconds…' });
   
   setTimeout(async () => {
     try { await i.channel.delete('Ticket closed'); } catch {}
@@ -535,7 +539,8 @@ async function closeTicketById(i, channelId, openerId) {
   const hasAllowedRole = ALLOWED_CLOSE_ROLES.some(roleId => i.member?.roles?.cache?.has(roleId));
 
   if (!isOpener && !hasEnvRole && !hasAllowedRole) {
-    return i.reply({ content: 'Only the opener or staff can close this ticket.', ephemeral: true });
+    await i.deferReply({ ephemeral: true });
+    return i.editReply({ content: 'Only the opener or staff can close this ticket.' });
   }
 
   try {
@@ -544,11 +549,13 @@ async function closeTicketById(i, channelId, openerId) {
       try {
         ch = await i.client.channels.fetch(channelId);
       } catch {
-        return i.reply({ content: 'That ticket channel no longer exists (already closed or I cant see it).', ephemeral: true });
+        await i.deferReply({ ephemeral: true });
+        return i.editReply({ content: 'That ticket channel no longer exists (already closed or I cant see it).' });
       }
     }
     
-    await i.reply({ content: 'Closing ticket in 3 seconds…', ephemeral: true });
+    await i.deferReply({ ephemeral: true });
+    await i.editReply({ content: 'Closing ticket in 3 seconds…' });
     
     setTimeout(async () => {
       try { await ch.delete('Ticket closed'); } catch {}
@@ -556,7 +563,10 @@ async function closeTicketById(i, channelId, openerId) {
   } catch (err) {
     console.error('closeTicketById error:', err);
     try {
-      await i.reply({ content: 'Failed to close ticket (permissions or missing channel).', ephemeral: true });
+      if (!i.deferred && !i.replied) {
+        await i.deferReply({ ephemeral: true });
+      }
+      await i.editReply({ content: 'Failed to close ticket (permissions or missing channel).' });
     } catch {}
   }
 }
@@ -712,8 +722,12 @@ client.on('interactionCreate', async i => {
   console.log(`[${Date.now()}] Received interaction: ${i.id} | Type: ${i.type} | Command: ${i.commandName || 'N/A'}`);
   
   try {
-    // /swcalc launcher - DIRECT REPLY (no defer)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // /swcalc launcher - DEFER FIRST to survive cold starts
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isChatInputCommand() && i.commandName === 'swcalc') {
+      await i.deferReply({ ephemeral: true });
+      
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect());
       const row2 = new ActionRowBuilder().addComponents(buildSkillSelect());
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect());
@@ -728,12 +742,16 @@ client.on('interactionCreate', async i => {
         .setFooter(baseFooter(i.user));
       const banner = buildBannerEmbed();
 
-      await i.reply({ embeds: [info, banner], components: [row1, row2, row3, row4], ephemeral: true });
+      await i.editReply({ embeds: [info, banner], components: [row1, row2, row3, row4] });
       return;
     }
 
-    // Mode select - DIRECT UPDATE (no defer)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Mode select - DEFER UPDATE first
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isStringSelectMenu() && i.customId === 'swcalc_mode') {
+      await i.deferUpdate();
+      
       const mode = i.values[0];
       const skillComp = i.message.components[1].components[0];
       const selSkill =
@@ -752,12 +770,16 @@ client.on('interactionCreate', async i => {
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
       const row4 = new ActionRowBuilder().addComponents(buildNextButton(mode, selSkill, selAcct));
 
-      await i.update({ components: [row1, row2, row3, row4] });
+      await i.editReply({ components: [row1, row2, row3, row4] });
       return;
     }
 
-    // Skill select - DIRECT UPDATE (no defer)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Skill select - DEFER UPDATE first
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isStringSelectMenu() && i.customId === 'swcalc_skill') {
+      await i.deferUpdate();
+      
       const skill = i.values[0];
       const modeComp = i.message.components[0].components[0];
       const selMode =
@@ -776,12 +798,16 @@ client.on('interactionCreate', async i => {
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(selAcct));
       const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, skill, selAcct));
 
-      await i.update({ components: [row1, row2, row3, row4] });
+      await i.editReply({ components: [row1, row2, row3, row4] });
       return;
     }
 
-    // Account type select - DIRECT UPDATE (no defer)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Account type select - DEFER UPDATE first
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isStringSelectMenu() && i.customId === 'swcalc_acct') {
+      await i.deferUpdate();
+      
       const acctType = i.values[0];
       const modeComp = i.message.components[0].components[0];
       const selMode =
@@ -796,15 +822,18 @@ client.on('interactionCreate', async i => {
         'Strength';
 
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
+      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(acctType === '10hp' ? selMode : selMode));
+      const row2Fixed = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType));
       const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, selSkill, acctType));
 
-      await i.update({ components: [row1, row2, row3, row4] });
+      await i.editReply({ components: [row1, row2Fixed, row3, row4] });
       return;
     }
 
-    // Next → modal (showModal is instant, no defer needed)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Next → modal (showModal MUST be first - cannot defer before modal)
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isButton() && i.customId.startsWith('swcalc_next|')) {
       const [, mode, skill, acctType] = i.customId.split('|');
 
@@ -824,6 +853,7 @@ client.on('interactionCreate', async i => {
         .setStyle(TextInputStyle.Short)
         .setRequired(false);
 
+      // showModal MUST be the first response - cannot defer before it
       await i.showModal(modal.addComponents(
         new ActionRowBuilder().addComponents(startVal),
         new ActionRowBuilder().addComponents(target)
@@ -838,45 +868,53 @@ client.on('interactionCreate', async i => {
       return;
     }
 
-	// Modal submit → calculation - DIRECT REPLY (no defer)
-	if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
-	  console.log(`[${Date.now()}] Modal submit START - ${i.id}`);
-	  
-	  const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
-	  const startRaw = i.fields.getTextInputValue('start_val').trim();
-	  const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Modal submit → calculation - DEFER FIRST
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (i.isModalSubmit() && i.customId.startsWith('swcalc_modal|')) {
+      console.log(`[${Date.now()}] Modal submit START - ${i.id}`);
+      
+      // DEFER IMMEDIATELY - this is critical for cold starts
+      await i.deferReply();
+      console.log(`[${Date.now()}] Deferred - ${i.id}`);
+      
+      const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
+      const startRaw = i.fields.getTextInputValue('start_val').trim();
+      const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
 
-	  const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
-	  if (!Number.isFinite(targetLevel) || targetLevel < 1 || targetLevel > 99) {
-		return i.reply({ content: 'Target level must be 1–99.', ephemeral: true });
-	  }
+      const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
+      if (!Number.isFinite(targetLevel) || targetLevel < 1 || targetLevel > 99) {
+        return i.editReply({ content: 'Target level must be 1–99.' });
+      }
 
-	  const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
-	  const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
+      const skill = VALID_SKILLS.includes(skillSel) ? skillSel : 'Strength';
+      const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
 
-	  let startXP;
-	  if (mode === 'xp') {
-		const v = parseInt(startRaw, 10);
-		if (!Number.isFinite(v) || v < 0) return i.reply({ content: 'Start XP must be a non-negative number.', ephemeral: true });
-		startXP = v;
-	  } else if (mode === 'lvl') {
-		const v = parseInt(startRaw, 10);
-		if (!Number.isFinite(v) || v < 1 || v > 99) return i.reply({ content: 'Start level must be 1–99.', ephemeral: true });
-		startXP = getXPForLevel(v);
-	  } else {
-		return i.reply({ content: 'Invalid mode.', ephemeral: true });
-	  }
+      let startXP;
+      if (mode === 'xp') {
+        const v = parseInt(startRaw, 10);
+        if (!Number.isFinite(v) || v < 0) return i.editReply({ content: 'Start XP must be a non-negative number.' });
+        startXP = v;
+      } else if (mode === 'lvl') {
+        const v = parseInt(startRaw, 10);
+        if (!Number.isFinite(v) || v < 1 || v > 99) return i.editReply({ content: 'Start level must be 1–99.' });
+        startXP = getXPForLevel(v);
+      } else {
+        return i.editReply({ content: 'Invalid mode.' });
+      }
 
-	  console.log(`[${Date.now()}] Building payload - ${i.id}`);
-	  const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType });
-	  
-	  console.log(`[${Date.now()}] About to reply - ${i.id}`);
-	  await i.reply(payload);
-	  console.log(`[${Date.now()}] Reply sent - ${i.id}`);
-	  return;
-	}
+      console.log(`[${Date.now()}] Building payload - ${i.id}`);
+      const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType });
+      
+      console.log(`[${Date.now()}] About to editReply - ${i.id}`);
+      await i.editReply(payload);
+      console.log(`[${Date.now()}] Reply sent - ${i.id}`);
+      return;
+    }
 
-    // Buttons on embeds
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Buttons on embeds (swv3|...)
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isButton() && i.customId.startsWith('swv3|')) {
       const parts = i.customId.split('|');
       const startXP = parseInt(parts[1], 10);
@@ -888,6 +926,9 @@ client.on('interactionCreate', async i => {
       const result = calcSoulWarsPlan(startXP, targetLevel, skill);
       const inTicket = !!(i.channel?.name && /^sw-\d+$/i.test(i.channel.name));
 
+      // ─────────────────────────────────────────────────────────────────────────
+      // TICKET button - already defers (slow operation)
+      // ─────────────────────────────────────────────────────────────────────────
       if (action === 'ticket') {
         try {
           const guildId = i.guild.id;
@@ -899,10 +940,8 @@ client.on('interactionCreate', async i => {
             const existingChannel = i.guild.channels.cache.get(existingChannelId);
             
             if (existingChannel) {
-              await i.reply({ 
-                content: `You already have an open ticket: ${existingChannel}`, 
-                ephemeral: true 
-              });
+              await i.deferReply({ ephemeral: true });
+              await i.editReply({ content: `You already have an open ticket: ${existingChannel}` });
               return;
             } else {
               removeActiveTicketByChannelId(existingChannelId);
@@ -935,52 +974,75 @@ client.on('interactionCreate', async i => {
           return;
         } catch (err) {
           console.error('openTicketChannel error:', err);
-          try { await i.editReply({ content: 'Could not create ticket channel (check bot permissions & category ID).' }); } catch {}
+          try { 
+            if (!i.deferred && !i.replied) {
+              await i.deferReply({ ephemeral: true });
+            }
+            await i.editReply({ content: 'Could not create ticket channel (check bot permissions & category ID).' }); 
+          } catch {}
           return;
         }
       }
 
+      // ─────────────────────────────────────────────────────────────────────────
+      // DOWNLOAD button - DEFER FIRST
+      // ─────────────────────────────────────────────────────────────────────────
       if (action === 'dl') {
+        await i.deferReply({ ephemeral: true });
+        
         if (result.ok && result.rows.length) {
           const files = buildTextFileAttachment(result.rows);
-          await i.reply({ files, ephemeral: true });
+          await i.editReply({ files });
         } else {
-          await i.reply({ content: 'No breakdown available for this input.', ephemeral: true });
+          await i.editReply({ content: 'No breakdown available for this input.' });
         }
         return;
       }
 
+      // ─────────────────────────────────────────────────────────────────────────
+      // PAYMENT button - DEFER FIRST
+      // ─────────────────────────────────────────────────────────────────────────
       if (action === 'pay') {
+        await i.deferReply({ ephemeral: true });
+        
         const payEmbed = buildPaymentEmbedPublic(i);
-        await i.reply({ embeds: [payEmbed], ephemeral: true });
+        await i.editReply({ embeds: [payEmbed] });
         return;
       }
 
-      // Toggle view - DIRECT UPDATE (no defer)
+      // ─────────────────────────────────────────────────────────────────────────
+      // Toggle view (band/day) - DEFER UPDATE FIRST
+      // ─────────────────────────────────────────────────────────────────────────
       if (action === 'band' || action === 'day') {
+        await i.deferUpdate();
+        
         const view = action === 'day' ? 'day' : 'band';
         const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
         const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
 
         if (inTicket) {
           const row = buildToggleRow(ctx, view);
-          await i.update({ embeds: [info], components: [row] });
+          await i.editReply({ embeds: [info], components: [row] });
         } else {
           const banner = buildBannerEmbed();
           const row = buildActionRow(ctx, view);
-          await i.update({ embeds: [info, banner], components: [row] });
+          await i.editReply({ embeds: [info, banner], components: [row] });
         }
         return;
       }
     }
 
-    // Ticket close (inside ticket)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Ticket close (inside ticket) - handled in closeTicketChannel with defer
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isButton() && i.customId.startsWith('ticketclose|')) {
       await closeTicketChannel(i);
       return;
     }
 
-    // Ephemeral close by id
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Ephemeral close by id - handled in closeTicketById with defer
+    // ═══════════════════════════════════════════════════════════════════════════
     if (i.isButton() && i.customId.startsWith('ticketclosebyid|')) {
       const [, channelId, openerId] = i.customId.split('|');
       await closeTicketById(i, channelId, openerId);
@@ -990,7 +1052,10 @@ client.on('interactionCreate', async i => {
     console.error('interactionCreate error:', err);
     try {
       if (i.isRepliable() && !i.replied && !i.deferred) {
-        await i.reply({ content: `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}`, ephemeral: true });
+        await i.deferReply({ ephemeral: true });
+        await i.editReply({ content: `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}` });
+      } else if (i.deferred) {
+        await i.editReply({ content: `Error: ${err?.name || 'Exception'}${err?.message ? ` — ${err.message}` : ''}` });
       }
     } catch {}
   }
