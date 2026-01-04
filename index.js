@@ -6,6 +6,7 @@
 // - Ephemeral: confirmation with link + Close Ticket by ID
 // - Multi-guild slash deploy via GUILD_IDS (comma-separated). Falls back to global if empty.
 // - ALL interactions now use defer → edit pattern to survive Render cold starts
+// - RSN lookup: optionally enter RSN to auto-fetch current XP from OSRS hiscores
 
 require('dotenv').config();
 
@@ -20,6 +21,9 @@ const ALLOWED_CLOSE_ROLES = [
   '1238423254637613086',
   '1238405570491318293'
 ];
+
+// ───────── Hiscores Module ─────────
+const { getPlayerStats } = require('./hiscores');
 
 // ───────── Tiny HTTP server for Render (safe no-op for Background Worker) ─────────
 const http = require('http');
@@ -199,6 +203,11 @@ function accountLabel(acctType) {
   return acctType === '10hp' ? '10 HP' : 'Non-10 HP';
 }
 
+// Map skill names to hiscores keys (lowercase)
+function skillToHiscoreKey(skill) {
+  return skill.toLowerCase();
+}
+
 // ───────── Core Calculations ─────────
 function calcSoulWarsPlan(startXP, targetLevel, skill) {
   const targetXP = getXPForLevel(targetLevel);
@@ -340,7 +349,7 @@ function buildPlanField(titleSingle, lines) {
   return [{ name: titleSingle, value: lines.join('\n') }];
 }
 
-function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view = 'band') {
+function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType, rsn }, result, view = 'band') {
   const { emoji } = skillTheme(skill);
 
   if (!result.ok) {
@@ -365,10 +374,13 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, vi
   const lines = view === 'band' ? buildBandLines(result.rows) : buildDayLines(calcPlanByDay(startXP, targetLevel, skill));
   const hours = result.ok ? (result.tokens / ZEAL_PER_HOUR) : 0;
 
+  // Build title - include RSN if provided
+  const titleRsn = rsn ? ` (${rsn})` : '';
+  
   const embed = new EmbedBuilder()
     .setColor(THEME_RED)
     .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
-    .setTitle(`${emoji} ${skill}: ${fmtInt(startXP)} XP → level ${targetLevel}`)
+    .setTitle(`${emoji} ${skill}${titleRsn}: ${fmtInt(startXP)} XP → level ${targetLevel}`)
     .setDescription(
       [
         `📊 Current level: **${getLevel(startXP)}**`,
@@ -614,13 +626,15 @@ async function openTicketChannel(i, embedsToCopy, componentsToCopy) {
 }
 
 // ───────── Main Flow ─────────
-function buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType }) {
+function buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType, rsn }) {
   const result = calcSoulWarsPlan(startXP, targetLevel, skill);
   const view = 'band';
-  const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
+  const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType, rsn }, result, view);
   const banner = buildBannerEmbed();
 
-  const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
+  // Include RSN in context if provided (URL-safe encoding)
+  const rsnPart = rsn ? `|${encodeURIComponent(rsn)}` : '';
+  const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}${rsnPart}`;
   const row = buildActionRow(ctx, 'band');
   return { embeds: [info, banner], components: [row] };
 }
@@ -683,7 +697,8 @@ function buildModeSelect(selected = 'xp', disabled = false) {
     .setDisabled(disabled)
     .addOptions(
       { label: 'XP',  value: 'xp',  default: selected === 'xp'  },
-      { label: 'LVL', value: 'lvl', default: selected === 'lvl' }
+      { label: 'LVL', value: 'lvl', default: selected === 'lvl' },
+      { label: 'RSN Lookup', value: 'rsn', default: selected === 'rsn' }
     );
 }
 
@@ -737,7 +752,16 @@ client.on('interactionCreate', async i => {
         .setColor(THEME_RED)
         .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
         .setTitle('Soul Wars Calculator')
-        .setDescription('Select **Mode**, **Skill**, and **Account Type**, then press **Next**.')
+        .setDescription(
+          [
+            'Select **Mode**, **Skill**, and **Account Type**, then press **Next**.',
+            '',
+            '**Modes:**',
+            '• **XP** — Enter your current XP manually',
+            '• **LVL** — Enter your current level manually', 
+            '• **RSN Lookup** — Enter your RuneScape name to auto-fetch your current XP'
+          ].join('\n')
+        )
         .setThumbnail(WATERMARK_URL)
         .setFooter(baseFooter(i.user));
       const banner = buildBannerEmbed();
@@ -822,7 +846,6 @@ client.on('interactionCreate', async i => {
         'Strength';
 
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect(selMode));
-      const row2 = new ActionRowBuilder().addComponents(buildSkillSelect(acctType === '10hp' ? selMode : selMode));
       const row2Fixed = new ActionRowBuilder().addComponents(buildSkillSelect(selSkill));
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect(acctType));
       const row4 = new ActionRowBuilder().addComponents(buildNextButton(selMode, selSkill, acctType));
@@ -839,25 +862,49 @@ client.on('interactionCreate', async i => {
 
       const modal = new ModalBuilder().setCustomId(`swcalc_modal|${mode}|${skill}|${acctType}`).setTitle('Soul Wars Input');
 
-      const startVal = new TextInputBuilder()
-        .setCustomId('start_val')
-        .setLabel(mode === 'xp' ? 'Start XP' : 'Start Level')
-        .setPlaceholder(mode === 'xp' ? 'e.g. 100000' : 'e.g. 30')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(true);
+      // Different input fields based on mode
+      if (mode === 'rsn') {
+        // RSN Lookup mode - just need RSN and target level
+        const rsnInput = new TextInputBuilder()
+          .setCustomId('rsn')
+          .setLabel('RuneScape Name (RSN)')
+          .setPlaceholder('e.g. Zezima')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(12);
 
-      const target = new TextInputBuilder()
-        .setCustomId('target_level')
-        .setLabel('Target level (default 99)')
-        .setPlaceholder('e.g. 89  or blank → 99')
-        .setStyle(TextInputStyle.Short)
-        .setRequired(false);
+        const target = new TextInputBuilder()
+          .setCustomId('target_level')
+          .setLabel('Target level (default 99)')
+          .setPlaceholder('e.g. 89  or blank → 99')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false);
 
-      // showModal MUST be the first response - cannot defer before it
-      await i.showModal(modal.addComponents(
-        new ActionRowBuilder().addComponents(startVal),
-        new ActionRowBuilder().addComponents(target)
-      ));
+        await i.showModal(modal.addComponents(
+          new ActionRowBuilder().addComponents(rsnInput),
+          new ActionRowBuilder().addComponents(target)
+        ));
+      } else {
+        // XP or LVL mode - manual entry
+        const startVal = new TextInputBuilder()
+          .setCustomId('start_val')
+          .setLabel(mode === 'xp' ? 'Start XP' : 'Start Level')
+          .setPlaceholder(mode === 'xp' ? 'e.g. 100000' : 'e.g. 30')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true);
+
+        const target = new TextInputBuilder()
+          .setCustomId('target_level')
+          .setLabel('Target level (default 99)')
+          .setPlaceholder('e.g. 89  or blank → 99')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false);
+
+        await i.showModal(modal.addComponents(
+          new ActionRowBuilder().addComponents(startVal),
+          new ActionRowBuilder().addComponents(target)
+        ));
+      }
 
       // Disable controls after modal opens (fire and forget)
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect(mode, true));
@@ -879,7 +926,6 @@ client.on('interactionCreate', async i => {
       console.log(`[${Date.now()}] Deferred - ${i.id}`);
       
       const [, mode, skillSel, acctTypeSel] = i.customId.split('|');
-      const startRaw = i.fields.getTextInputValue('start_val').trim();
       const targetRaw = (i.fields.getTextInputValue('target_level') || '').trim();
 
       const targetLevel = targetRaw ? parseInt(targetRaw, 10) : 99;
@@ -891,11 +937,40 @@ client.on('interactionCreate', async i => {
       const acctType = acctTypeSel === '10hp' || acctTypeSel === 'non10hp' ? acctTypeSel : 'non10hp';
 
       let startXP;
-      if (mode === 'xp') {
+      let rsn = null;
+
+      if (mode === 'rsn') {
+        // RSN Lookup mode
+        rsn = i.fields.getTextInputValue('rsn').trim();
+        if (!rsn) {
+          return i.editReply({ content: 'Please enter a RuneScape name.' });
+        }
+
+        try {
+          console.log(`[${Date.now()}] Looking up RSN: ${rsn}`);
+          const stats = await getPlayerStats(rsn);
+          
+          // Get the XP for the selected skill
+          const hiscoreKey = skillToHiscoreKey(skill);
+          const xpKey = `${hiscoreKey}_xp`;
+          
+          if (stats[xpKey] === undefined) {
+            return i.editReply({ content: `Could not find ${skill} XP for **${rsn}**. The player may be unranked in this skill.` });
+          }
+          
+          startXP = stats[xpKey];
+          console.log(`[${Date.now()}] Found ${skill} XP for ${rsn}: ${startXP}`);
+        } catch (err) {
+          console.error(`Hiscores lookup error for ${rsn}:`, err);
+          return i.editReply({ content: `❌ ${err.message || 'Could not look up player stats.'}` });
+        }
+      } else if (mode === 'xp') {
+        const startRaw = i.fields.getTextInputValue('start_val').trim();
         const v = parseInt(startRaw, 10);
         if (!Number.isFinite(v) || v < 0) return i.editReply({ content: 'Start XP must be a non-negative number.' });
         startXP = v;
       } else if (mode === 'lvl') {
+        const startRaw = i.fields.getTextInputValue('start_val').trim();
         const v = parseInt(startRaw, 10);
         if (!Number.isFinite(v) || v < 1 || v > 99) return i.editReply({ content: 'Start level must be 1–99.' });
         startXP = getXPForLevel(v);
@@ -904,7 +979,7 @@ client.on('interactionCreate', async i => {
       }
 
       console.log(`[${Date.now()}] Building payload - ${i.id}`);
-      const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType });
+      const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType, rsn });
       
       console.log(`[${Date.now()}] About to editReply - ${i.id}`);
       await i.editReply(payload);
@@ -922,6 +997,8 @@ client.on('interactionCreate', async i => {
       const skill = parts[3];
       const acctType = parts[4] === '10hp' || parts[4] === 'non10hp' ? parts[4] : 'non10hp';
       const action = parts[5];
+      // RSN is optionally at parts[6] if it was included
+      const rsn = parts[6] ? decodeURIComponent(parts[6]) : null;
 
       const result = calcSoulWarsPlan(startXP, targetLevel, skill);
       const inTicket = !!(i.channel?.name && /^sw-\d+$/i.test(i.channel.name));
@@ -951,8 +1028,9 @@ client.on('interactionCreate', async i => {
           // Defer here because ticket creation takes time
           await i.deferReply({ ephemeral: true });
 
-          const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, 'band');
-          const ctxTicket = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
+          const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType, rsn }, result, 'band');
+          const rsnPart = rsn ? `|${encodeURIComponent(rsn)}` : '';
+          const ctxTicket = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}${rsnPart}`;
           const rowToggle = buildToggleRow(ctxTicket, 'band');
           
           const ch = await openTicketChannel(i, [info], rowToggle);
@@ -1017,8 +1095,9 @@ client.on('interactionCreate', async i => {
         await i.deferUpdate();
         
         const view = action === 'day' ? 'day' : 'band';
-        const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType }, result, view);
-        const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}`;
+        const info = buildInfoEmbed(i, { skill, startXP, targetLevel, acctType, rsn }, result, view);
+        const rsnPart = rsn ? `|${encodeURIComponent(rsn)}` : '';
+        const ctx = `swv3|${startXP}|${targetLevel}|${skill}|${acctType}${rsnPart}`;
 
         if (inTicket) {
           const row = buildToggleRow(ctx, view);
