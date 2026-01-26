@@ -82,15 +82,31 @@ const client = new Client({
 });
 
 // ───────── Domain Constants ─────────
-const VALID_SKILLS = ['Strength', 'Attack', 'Defence', 'Hitpoints', 'Ranged', 'Magic', 'Prayer'];
+// UPDATED: New skill order as requested
+const VALID_SKILLS = ['Strength', 'Ranged', 'Magic', 'Hitpoints', 'Defence', 'Prayer'];
 const DAILY_CAP_XP = 1_000_000;
 const THEME_RED = 0xff0000;
 
-// Pricing (gp per zeal)
-const PRICE_PER_TOKEN = {
-  '10hp': 50_000,
-  non10hp: 40_000
-};
+// ───────── Tiered Pricing ─────────
+// Normal Dolo Boost (minimal HP XP)
+const NORMAL_PRICE_TIERS = [
+  { maxZeal: 2499,   rate: 40_000,   discount: 0 },
+  { maxZeal: 4999,   rate: 38_000,   discount: 5 },
+  { maxZeal: 9999,   rate: 36_000,   discount: 10 },
+  { maxZeal: 14999,  rate: 34_000,   discount: 15 },
+  { maxZeal: 19999,  rate: 32_000,   discount: 20 },
+  { maxZeal: Infinity, rate: 30_000, discount: 25 }
+];
+
+// 10 HP Restricted
+const HP10_PRICE_TIERS = [
+  { maxZeal: 2499,   rate: 50_000,   discount: 0 },
+  { maxZeal: 4999,   rate: 47_500,   discount: 5 },
+  { maxZeal: 9999,   rate: 45_000,   discount: 10 },
+  { maxZeal: 14999,  rate: 42_500,   discount: 15 },
+  { maxZeal: 19999,  rate: 40_000,   discount: 20 },
+  { maxZeal: Infinity, rate: 37_500, discount: 25 }
+];
 
 // Soul Wars XP per zeal by band
 const swRates = [
@@ -194,9 +210,13 @@ function baseFooter(user) {
   return { text: `Requested by ${user.username} • ${new Date().toLocaleString('en-GB')}`, iconURL: LOGO_URL };
 }
 
+// UPDATED: Tiered pricing function
 function gpCost(zeal, acctType) {
-  const rate = PRICE_PER_TOKEN[acctType] ?? PRICE_PER_TOKEN['non10hp'];
-  return { rate, total: zeal * rate };
+  const tiers = acctType === '10hp' ? HP10_PRICE_TIERS : NORMAL_PRICE_TIERS;
+  const tier = tiers.find(t => zeal <= t.maxZeal);
+  const rate = tier.rate;
+  const discount = tier.discount;
+  return { rate, total: zeal * rate, discount };
 }
 
 function accountLabel(acctType) {
@@ -369,8 +389,9 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType, rsn }, resul
       .setDescription('You must be at least level 30 in the chosen skill to redeem Soul Wars XP.');
   }
 
-  const { rate, total } = gpCost(result.tokens, acctType);
+  const { rate, total, discount } = gpCost(result.tokens, acctType);
   const bar = progressBar(startXP, result.targetXPAbs);
+  // UPDATED: Changed field title based on view
   const lines = view === 'band' ? buildBandLines(result.rows) : buildDayLines(calcPlanByDay(startXP, targetLevel, skill));
   const hours = result.ok ? (result.tokens / ZEAL_PER_HOUR) : 0;
 
@@ -394,12 +415,15 @@ function buildInfoEmbed(i, { skill, startXP, targetLevel, acctType, rsn }, resul
     .setThumbnail(WATERMARK_URL)
     .setFooter(baseFooter(i.user));
 
-  const fieldTitle = view === 'band' ? 'Plan by band' : 'Plan by day';
+  // UPDATED: Changed "Plan by band" to "Zeal spend by XP Bracket"
+  const fieldTitle = view === 'band' ? 'Zeal spend by XP Bracket' : 'Plan by day';
   embed.addFields(buildPlanField(fieldTitle, lines));
 
+  // UPDATED: Show discount percentage if applicable
+  const discountText = discount > 0 ? ` _(${discount}% bulk discount applied!)_` : '';
   embed.addFields({
     name: 'Pricing',
-    value: `**${accountLabel(acctType)}** — **${fmtInt(total)} gp** _(at ${fmtInt(rate)} gp/zeal)_`
+    value: `**${accountLabel(acctType)}** — **${fmtInt(total)} gp** _(at ${fmtInt(rate)} gp/zeal)_${discountText}`
   });
 
   return embed;
@@ -443,7 +467,8 @@ function buildEphemeralCreatedEmbed(i, channelUrl) {
 // ───────── Buttons / Rows ─────────
 function buildActionRow(ctx, activeView) {
   const isBand = activeView === 'band';
-  const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
+  // UPDATED: Changed label from "Plan by band" to "Zeal spend by XP Bracket"
+  const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Zeal spend by XP Bracket').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dlBtn   = new ButtonBuilder().setCustomId(`${ctx}|dl`).setLabel('Breakdown').setStyle(ButtonStyle.Secondary);
   const payBtn  = new ButtonBuilder().setCustomId(`${ctx}|pay`).setLabel('Payment Info').setStyle(ButtonStyle.Success);
@@ -453,7 +478,8 @@ function buildActionRow(ctx, activeView) {
 
 function buildToggleRow(ctx, activeView) {
   const isBand = activeView === 'band';
-  const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Plan by band').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
+  // UPDATED: Changed label from "Plan by band" to "Zeal spend by XP Bracket"
+  const bandBtn = new ButtonBuilder().setCustomId(`${ctx}|band`).setLabel('Zeal spend by XP Bracket').setStyle(isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   const dayBtn  = new ButtonBuilder().setCustomId(`${ctx}|day`).setLabel('Plan by day').setStyle(!isBand ? ButtonStyle.Primary : ButtonStyle.Secondary);
   return new ActionRowBuilder().addComponents(bandBtn, dayBtn);
 }
@@ -690,15 +716,17 @@ async function deploySlash() {
 }
 
 // ───────── UI Builders ─────────
-function buildModeSelect(selected = 'xp', disabled = false) {
+// UPDATED: Default mode is now 'rsn' instead of 'xp'
+function buildModeSelect(selected = 'rsn', disabled = false) {
   return new StringSelectMenuBuilder()
     .setCustomId('swcalc_mode')
     .setPlaceholder('Select mode')
     .setDisabled(disabled)
     .addOptions(
+      // UPDATED: RSN option is now first
+      { label: 'RSN Lookup', value: 'rsn', default: selected === 'rsn' },
       { label: 'XP',  value: 'xp',  default: selected === 'xp'  },
-      { label: 'LVL', value: 'lvl', default: selected === 'lvl' },
-      { label: 'RSN Lookup', value: 'rsn', default: selected === 'rsn' }
+      { label: 'LVL', value: 'lvl', default: selected === 'lvl' }
     );
 }
 
@@ -743,10 +771,11 @@ client.on('interactionCreate', async i => {
     if (i.isChatInputCommand() && i.commandName === 'swcalc') {
       await i.deferReply({ ephemeral: true });
       
+      // UPDATED: Default mode is now 'rsn'
       const row1 = new ActionRowBuilder().addComponents(buildModeSelect());
       const row2 = new ActionRowBuilder().addComponents(buildSkillSelect());
       const row3 = new ActionRowBuilder().addComponents(buildAccountSelect());
-      const row4 = new ActionRowBuilder().addComponents(buildNextButton('xp', 'Strength', 'non10hp'));
+      const row4 = new ActionRowBuilder().addComponents(buildNextButton('rsn', 'Strength', 'non10hp'));
 
       const info = new EmbedBuilder()
         .setColor(THEME_RED)
@@ -757,9 +786,9 @@ client.on('interactionCreate', async i => {
             'Select **Mode**, **Skill**, and **Account Type**, then press **Next**.',
             '',
             '**Modes:**',
+            '• **RSN Lookup** — Enter your RuneScape name to auto-fetch your current XP',
             '• **XP** — Enter your current XP manually',
-            '• **LVL** — Enter your current level manually', 
-            '• **RSN Lookup** — Enter your RuneScape name to auto-fetch your current XP'
+            '• **LVL** — Enter your current level manually'
           ].join('\n')
         )
         .setThumbnail(WATERMARK_URL)
@@ -809,7 +838,7 @@ client.on('interactionCreate', async i => {
       const selMode =
         (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
         (modeComp?.options?.find?.(o => o.default)?.value) ||
-        'xp';
+        'rsn';
 
       const acctComp = i.message.components[2].components[0];
       const selAcct =
@@ -837,7 +866,7 @@ client.on('interactionCreate', async i => {
       const selMode =
         (modeComp?.data?.options?.find?.(o => o.default)?.value) ||
         (modeComp?.options?.find?.(o => o.default)?.value) ||
-        'xp';
+        'rsn';
 
       const skillComp = i.message.components[1].components[0];
       const selSkill =
@@ -884,12 +913,32 @@ client.on('interactionCreate', async i => {
           new ActionRowBuilder().addComponents(rsnInput),
           new ActionRowBuilder().addComponents(target)
         ));
-      } else {
-        // XP or LVL mode - manual entry
+      } else if (mode === 'xp') {
+        // UPDATED: XP mode - new placeholder text
         const startVal = new TextInputBuilder()
           .setCustomId('start_val')
-          .setLabel(mode === 'xp' ? 'Start XP' : 'Start Level')
-          .setPlaceholder(mode === 'xp' ? 'e.g. 100000' : 'e.g. 30')
+          .setLabel('Start XP')
+          .setPlaceholder('Min XP - 13,363')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true);
+
+        const target = new TextInputBuilder()
+          .setCustomId('target_level')
+          .setLabel('Target level (default 99)')
+          .setPlaceholder('e.g. 89  or blank → 99')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false);
+
+        await i.showModal(modal.addComponents(
+          new ActionRowBuilder().addComponents(startVal),
+          new ActionRowBuilder().addComponents(target)
+        ));
+      } else {
+        // UPDATED: LVL mode - new placeholder text
+        const startVal = new TextInputBuilder()
+          .setCustomId('start_val')
+          .setLabel('Start Level')
+          .setPlaceholder('Min LVL - 30')
           .setStyle(TextInputStyle.Short)
           .setRequired(true);
 
@@ -996,9 +1045,10 @@ client.on('interactionCreate', async i => {
       const targetLevel = parseInt(parts[2], 10);
       const skill = parts[3];
       const acctType = parts[4] === '10hp' || parts[4] === 'non10hp' ? parts[4] : 'non10hp';
-      const action = parts[5];
-      // RSN is optionally at parts[6] if it was included
-      const rsn = parts[6] ? decodeURIComponent(parts[6]) : null;
+      
+      // FIXED: Action is always the LAST part, RSN is at position 5 only if there are 7 parts
+      const action = parts[parts.length - 1];
+      const rsn = parts.length === 7 ? decodeURIComponent(parts[5]) : null;
 
       const result = calcSoulWarsPlan(startXP, targetLevel, skill);
       const inTicket = !!(i.channel?.name && /^sw-\d+$/i.test(i.channel.name));
