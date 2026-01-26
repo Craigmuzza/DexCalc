@@ -83,7 +83,7 @@ const client = new Client({
 
 // ───────── Domain Constants ─────────
 // UPDATED: New skill order as requested
-const VALID_SKILLS = ['Strength', 'Ranged', 'Magic', 'Hitpoints', 'Defence', 'Prayer'];
+const VALID_SKILLS = ['Strength', 'Ranged', 'Magic', 'Hitpoints', 'Attack', 'Defence', 'Prayer'];
 const DAILY_CAP_XP = 1_000_000;
 const THEME_RED = 0xff0000;
 
