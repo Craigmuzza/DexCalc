@@ -4,7 +4,7 @@
 //   "Customer Spend Totals" — Full CRM dashboard (one row per customer)
 //      A: Discord ID | B: Username | C: Display Name | D: Total Spent ($) | E: # Purchases
 //      F: Avg Purchase ($) | G: First Purchase | H: Last Purchase Date | I: Last Purchase ($)
-//      J: Last Purchase Note | K: Tier | L: Days Inactive | M: Join Date | N: Status
+//      J: Last Purchase Note | K: Rank | L: Days Inactive | M: Join Date | N: Status
 //
 //   "Transactions" — Individual payment log
 //      A: Date | B: Discord ID | C: Username | D: Amount ($) | E: Running Total ($) | F: Note | G: Logged By
@@ -18,32 +18,17 @@ const TRANSACTIONS_SHEET = 'Transactions';
 const CRM_HEADERS = [
   'Discord ID', 'Username', 'Display Name', 'Total Spent ($)', '# Purchases',
   'Avg Purchase ($)', 'First Purchase', 'Last Purchase Date', 'Last Purchase ($)',
-  'Last Purchase Note', 'Tier', 'Days Inactive', 'Join Date', 'Status'
+  'Last Purchase Note', 'Rank', 'Days Inactive', 'Join Date', 'Status'
 ];
 const CRM_COL_COUNT = CRM_HEADERS.length; // A through N = 14
 
 const TX_HEADERS = ['Date', 'Discord ID', 'Username', 'Amount ($)', 'Running Total ($)', 'Note', 'Logged By'];
 
 // ───────── Customer Tiers ─────────
-// Import from config or use defaults
-let CUSTOMER_TIERS;
-try {
-  CUSTOMER_TIERS = require('./config').CUSTOMER_TIERS;
-} catch { /* fallback below */ }
-
-if (!CUSTOMER_TIERS || !CUSTOMER_TIERS.length) {
-  CUSTOMER_TIERS = [
-    { name: 'New',      emoji: '🆕', minSpend: 0,    maxSpend: 0      },
-    { name: 'Bronze',   emoji: '🥉', minSpend: 0.01, maxSpend: 99.99  },
-    { name: 'Silver',   emoji: '🥈', minSpend: 100,  maxSpend: 249.99 },
-    { name: 'Gold',     emoji: '🥇', minSpend: 250,  maxSpend: 499.99 },
-    { name: 'Platinum', emoji: '💎', minSpend: 500,  maxSpend: 999.99 },
-    { name: 'Diamond',  emoji: '👑', minSpend: 1000, maxSpend: Infinity }
-  ];
-}
+const CUSTOMER_TIERS = require('./config').CUSTOMER_TIERS;
 
 function getTier(totalSpent) {
-  if (totalSpent <= 0) return CUSTOMER_TIERS[0]; // New
+  // Walk backwards through tiers (highest first) to find the matching tier
   for (let i = CUSTOMER_TIERS.length - 1; i >= 0; i--) {
     if (totalSpent >= CUSTOMER_TIERS[i].minSpend) return CUSTOMER_TIERS[i];
   }

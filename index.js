@@ -104,6 +104,35 @@ function canUsePaidCommand(member) {
   return false;
 }
 
+// ───────── Auto-Role Assignment on Tier Change ─────────
+async function updateTierRole(guild, userId, previousTier, newTier) {
+  if (!previousTier?.roleId && !newTier?.roleId) return null; // no roles configured
+  if (previousTier?.name === newTier?.name) return null; // no tier change
+
+  try {
+    const member = await guild.members.fetch(userId);
+
+    // Remove ALL tier roles first (clean slate — handles edge cases)
+    const allTierRoleIds = CUSTOMER_TIERS.map(t => t.roleId).filter(Boolean);
+    const rolesToRemove = allTierRoleIds.filter(id => member.roles.cache.has(id));
+    if (rolesToRemove.length) {
+      await member.roles.remove(rolesToRemove, 'Tier role update');
+    }
+
+    // Add the new tier role
+    if (newTier?.roleId) {
+      await member.roles.add(newTier.roleId, `Rank up: ${newTier.emoji} ${newTier.name}`);
+      log('roles', `${member.user.username}: ${previousTier?.name || 'none'} → ${newTier.name}`);
+      return newTier;
+    }
+
+    return null;
+  } catch (err) {
+    log('roles', `Failed to update role for ${userId}: ${err.message}`);
+    return null;
+  }
+}
+
 // ───────── Build Full Calculation Payload ─────────
 function buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType, rsn }) {
   const result = calcSoulWarsPlan(startXP, targetLevel, skill);
@@ -217,8 +246,14 @@ client.on('interactionCreate', async i => {
 
         const result = await recordPayment(targetUser.id, targetUser.username, displayName, amount, note, i.user.username);
 
+        // Auto-assign tier role if tier changed
+        let roleUpdated = null;
+        if (result.tierUp) {
+          roleUpdated = await updateTierRole(i.guild, targetUser.id, result.previousTier, result.tier);
+        }
+
         const tierUpText = result.tierUp
-          ? `\n\n🎉 **TIER UP!** ${result.previousTier.emoji} ${result.previousTier.name} → ${result.tier.emoji} ${result.tier.name}`
+          ? `\n\n🎉 **RANK UP!** ${result.previousTier.emoji} ${result.previousTier.name} → ${result.tier.emoji} ${result.tier.name}${roleUpdated ? '\n✅ Role updated automatically' : ''}`
           : '';
 
         const embed = new EmbedBuilder()
@@ -230,7 +265,7 @@ client.on('interactionCreate', async i => {
             `**Amount:** ${fmtUSD(amount)}`,
             `**New total:** ${fmtUSD(result.newTotal)} _(was ${fmtUSD(result.previousTotal)})_`,
             `**Purchase #:** ${result.purchaseCount}`,
-            `**Tier:** ${result.tier.emoji} ${result.tier.name}`,
+            `**Rank:** ${result.tier.emoji} ${result.tier.name}`,
             note ? `**Note:** ${note}` : '',
             tierUpText
           ].filter(Boolean).join('\n'))
@@ -270,6 +305,16 @@ client.on('interactionCreate', async i => {
 
         if (!result) return i.editReply({ content: `**${targetUser.username}** has no records to refund.` });
 
+        // Update tier role if tier dropped
+        const prevTier = getTier(result.previousTotal);
+        if (prevTier.name !== result.tier.name) {
+          await updateTierRole(i.guild, targetUser.id, prevTier, result.tier);
+        }
+
+        const tierChangeText = prevTier.name !== result.tier.name
+          ? `\n⚠️ Rank changed: ${prevTier.emoji} ${prevTier.name} → ${result.tier.emoji} ${result.tier.name}`
+          : '';
+
         const embed = new EmbedBuilder()
           .setColor(0xff6600)
           .setAuthor({ name: 'Refund Recorded', iconURL: LOGO_URL })
@@ -278,8 +323,9 @@ client.on('interactionCreate', async i => {
             `**Customer:** <@${targetUser.id}> (${targetUser.username})`,
             `**Refunded:** ${fmtUSD(amount)}`,
             `**New total:** ${fmtUSD(result.newTotal)} _(was ${fmtUSD(result.previousTotal)})_`,
-            `**Tier:** ${result.tier.emoji} ${result.tier.name}`,
-            note ? `**Reason:** ${note}` : ''
+            `**Rank:** ${result.tier.emoji} ${result.tier.name}`,
+            note ? `**Reason:** ${note}` : '',
+            tierChangeText
           ].filter(Boolean).join('\n'))
           .setFooter({ text: `Processed by ${i.user.username}`, iconURL: LOGO_URL })
           .setTimestamp();
@@ -326,7 +372,7 @@ client.on('interactionCreate', async i => {
         const nextTier = CUSTOMER_TIERS[tierIdx + 1] || null;
         const tierProgress = nextTier
           ? `${fmtUSD(customer.totalSpent)} / ${fmtUSD(nextTier.minSpend)} to ${nextTier.emoji} ${nextTier.name}`
-          : '🏆 Max tier reached!';
+          : '🏆 Max rank reached!';
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
@@ -334,7 +380,7 @@ client.on('interactionCreate', async i => {
           .setTitle(`${tier.emoji} ${customer.displayName || customer.username}`)
           .setDescription([
             `**Discord:** <@${customer.discordId}>`,
-            `**Tier:** ${tier.emoji} ${tier.name}`,
+            `**Rank:** ${tier.emoji} ${tier.name}`,
             `**Status:** ${customer.liveStatus}`,
             `**Member since:** ${customer.joinDate || 'Unknown'}`
           ].join('\n'))
@@ -346,7 +392,7 @@ client.on('interactionCreate', async i => {
             { name: '📅 Last Purchase',  value: customer.lastPurchaseDate || 'N/A',  inline: true },
             { name: '💵 Last Amount',    value: customer.lastPurchaseAmt > 0 ? fmtUSD(customer.lastPurchaseAmt) : 'N/A', inline: true },
             { name: '⏳ Days Inactive',  value: customer.daysInactive > 0 ? `${customer.daysInactive} days` : 'N/A', inline: true },
-            { name: '🎯 Next Tier',      value: tierProgress, inline: false }
+            { name: '🎯 Next Rank',      value: tierProgress, inline: false }
           )
           .addFields({ name: '📝 Recent Transactions', value: txLines })
           .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
@@ -387,7 +433,7 @@ client.on('interactionCreate', async i => {
           .setTitle(`${tier.emoji} ${targetUser.username}`)
           .setDescription([
             `**Total spent:** ${fmtUSD(customer.totalSpent)}`,
-            `**Tier:** ${tier.emoji} ${tier.name}`,
+            `**Rank:** ${tier.emoji} ${tier.name}`,
             `**Purchases:** ${customer.purchaseCount}`,
             customer.lastPurchaseDate ? `**Last purchase:** ${customer.lastPurchaseDate}` : ''
           ].filter(Boolean).join('\n'))

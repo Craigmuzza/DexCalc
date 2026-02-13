@@ -101,14 +101,24 @@ const OSRS_XP_TABLE = [
   11805606, 13034431
 ];
 
-// ───────── Customer Tiers (for CRM rewards program) ─────────
+// ───────── Customer Tiers (mafia hierarchy + auto-role) ─────────
+// Role IDs loaded from TIER_ROLE_IDS env var: "Street Runner:ID,Associate:ID,..."
+const tierRoleMap = {};
+(process.env.TIER_ROLE_IDS || '').split(',').forEach(entry => {
+  const [name, roleId] = (entry || '').split(':').map(s => s.trim());
+  if (name && roleId) tierRoleMap[name] = roleId;
+});
+
 const CUSTOMER_TIERS = [
-  { name: 'New',      emoji: '🆕', minSpend: 0,    maxSpend: 0      },
-  { name: 'Bronze',   emoji: '🥉', minSpend: 0.01, maxSpend: 99.99  },
-  { name: 'Silver',   emoji: '🥈', minSpend: 100,  maxSpend: 249.99 },
-  { name: 'Gold',     emoji: '🥇', minSpend: 250,  maxSpend: 499.99 },
-  { name: 'Platinum', emoji: '💎', minSpend: 500,  maxSpend: 999.99 },
-  { name: 'Diamond',  emoji: '👑', minSpend: 1000, maxSpend: Infinity }
+  { name: 'Street Runner', emoji: '🚬', minSpend: 0,    roleId: tierRoleMap['Street Runner'] || null },
+  { name: 'Associate',     emoji: '🤝', minSpend: 50,   roleId: tierRoleMap['Associate']     || null },
+  { name: 'Made Man',      emoji: '🔫', minSpend: 125,  roleId: tierRoleMap['Made Man']      || null },
+  { name: 'Soldier',       emoji: '⚔️', minSpend: 250,  roleId: tierRoleMap['Soldier']       || null },
+  { name: 'Enforcer',      emoji: '🔨', minSpend: 400,  roleId: tierRoleMap['Enforcer']      || null },
+  { name: 'Capo',          emoji: '💰', minSpend: 750,  roleId: tierRoleMap['Capo']          || null },
+  { name: 'Consigliere',   emoji: '🧠', minSpend: 1500, roleId: tierRoleMap['Consigliere']   || null },
+  { name: 'Underboss',     emoji: '💎', minSpend: 3500, roleId: tierRoleMap['Underboss']     || null },
+  { name: 'Godfather',     emoji: '👑', minSpend: 7500, roleId: tierRoleMap['Godfather']     || null }
 ];
 
 // Skill emoji mapping
