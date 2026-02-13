@@ -104,31 +104,42 @@ function canUsePaidCommand(member) {
   return false;
 }
 
-// ───────── Auto-Role Assignment on Tier Change ─────────
-async function updateTierRole(guild, userId, previousTier, newTier) {
-  if (!previousTier?.roleId && !newTier?.roleId) return null; // no roles configured
-  if (previousTier?.name === newTier?.name) return null; // no tier change
+// ───────── Auto-Role Assignment ─────────
+// Ensures the member has EXACTLY the correct rank role (removes all others)
+async function ensureRankRole(guild, userId, targetTier, reason = 'Rank sync') {
+  const allTierRoleIds = CUSTOMER_TIERS.map(t => t.roleId).filter(Boolean);
+  if (!allTierRoleIds.length) {
+    log('roles', `SKIP: No role IDs configured. Set TIER_ROLE_IDS env var.`);
+    return null;
+  }
+
+  if (!targetTier?.roleId) {
+    log('roles', `SKIP: Target tier "${targetTier?.name}" has no roleId mapped.`);
+    return null;
+  }
 
   try {
     const member = await guild.members.fetch(userId);
 
-    // Remove ALL tier roles first (clean slate — handles edge cases)
-    const allTierRoleIds = CUSTOMER_TIERS.map(t => t.roleId).filter(Boolean);
-    const rolesToRemove = allTierRoleIds.filter(id => member.roles.cache.has(id));
-    if (rolesToRemove.length) {
-      await member.roles.remove(rolesToRemove, 'Tier role update');
+    // Check if they already have the correct role and ONLY the correct role
+    const currentTierRoles = allTierRoleIds.filter(id => member.roles.cache.has(id));
+    const alreadyCorrect = currentTierRoles.length === 1
+      && currentTierRoles[0] === targetTier.roleId;
+
+    if (alreadyCorrect) return null; // nothing to do
+
+    // Remove ALL tier roles first (clean slate)
+    if (currentTierRoles.length) {
+      await member.roles.remove(currentTierRoles, reason);
+      log('roles', `${member.user.username}: removed ${currentTierRoles.length} old rank role(s)`);
     }
 
-    // Add the new tier role
-    if (newTier?.roleId) {
-      await member.roles.add(newTier.roleId, `Rank up: ${newTier.emoji} ${newTier.name}`);
-      log('roles', `${member.user.username}: ${previousTier?.name || 'none'} → ${newTier.name}`);
-      return newTier;
-    }
-
-    return null;
+    // Add the correct tier role
+    await member.roles.add(targetTier.roleId, reason);
+    log('roles', `${member.user.username} → ${targetTier.emoji} ${targetTier.name} (${reason})`);
+    return targetTier;
   } catch (err) {
-    log('roles', `Failed to update role for ${userId}: ${err.message}`);
+    log('roles', `FAILED for ${userId}: ${err.message}`);
     return null;
   }
 }
@@ -157,6 +168,10 @@ client.once('clientReady', async () => {
   if (sheetsEnabled) log('bot', 'Google Sheets integration active');
   else log('bot', 'Google Sheets integration disabled (check config)');
 
+  // Log tier role config status
+  const configuredRoles = CUSTOMER_TIERS.filter(t => t.roleId).length;
+  log('bot', `Rank roles: ${configuredRoles}/${CUSTOMER_TIERS.length} configured ${configuredRoles === 0 ? '⚠️ Set TIER_ROLE_IDS env var!' : '✅'}`);
+
   if (DEPLOY_SLASH) await deploySlash(client);
 });
 
@@ -171,6 +186,11 @@ client.on('guildMemberAdd', async member => {
     const result = await addCustomer(member.id, member.user.username, member.displayName);
     if (result.isNew) {
       log('sheets', `Auto-added new member: ${member.user.username} (${member.id})`);
+    }
+    // Assign their rank role (Street Runner for new, or existing rank if returning)
+    const customer = await getCustomer(member.id);
+    if (customer) {
+      await ensureRankRole(member.guild, member.id, customer.tierObj, 'New member join');
     }
   } catch (err) {
     log('sheets', `Failed to auto-add ${member.user.username}: ${err.message}`);
@@ -246,11 +266,8 @@ client.on('interactionCreate', async i => {
 
         const result = await recordPayment(targetUser.id, targetUser.username, displayName, amount, note, i.user.username);
 
-        // Auto-assign tier role if tier changed
-        let roleUpdated = null;
-        if (result.tierUp) {
-          roleUpdated = await updateTierRole(i.guild, targetUser.id, result.previousTier, result.tier);
-        }
+        // Always ensure correct rank role (assigns if missing, upgrades on rank up)
+        const roleUpdated = await ensureRankRole(i.guild, targetUser.id, result.tier, result.tierUp ? 'Rank up' : 'Payment sync');
 
         const tierUpText = result.tierUp
           ? `\n\n🎉 **RANK UP!** ${result.previousTier.emoji} ${result.previousTier.name} → ${result.tier.emoji} ${result.tier.name}${roleUpdated ? '\n✅ Role updated automatically' : ''}`
@@ -305,11 +322,9 @@ client.on('interactionCreate', async i => {
 
         if (!result) return i.editReply({ content: `**${targetUser.username}** has no records to refund.` });
 
-        // Update tier role if tier dropped
+        // Always ensure correct rank role after refund
         const prevTier = getTier(result.previousTotal);
-        if (prevTier.name !== result.tier.name) {
-          await updateTierRole(i.guild, targetUser.id, prevTier, result.tier);
-        }
+        await ensureRankRole(i.guild, targetUser.id, result.tier, 'Refund adjustment');
 
         const tierChangeText = prevTier.name !== result.tier.name
           ? `\n⚠️ Rank changed: ${prevTier.emoji} ${prevTier.name} → ${result.tier.emoji} ${result.tier.name}`
@@ -548,6 +563,54 @@ client.on('interactionCreate', async i => {
       } catch (err) {
         log('revenue', `Error: ${err.message}`);
         await i.editReply({ content: `Failed to load revenue data: ${err.message}` });
+      }
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // /syncranks — Bulk-assign rank roles to all customers (staff only)
+    // ─────────────────────────────────────────────────────────
+    if (i.isChatInputCommand() && i.commandName === 'syncranks') {
+      await i.deferReply();
+
+      if (!sheetsEnabled) return i.editReply({ content: 'Google Sheets integration is not configured.' });
+      if (!canUsePaidCommand(i.member)) return i.editReply({ content: 'You do not have permission to use this command.' });
+
+      try {
+        const customers = await getAllCustomers();
+        let updated = 0;
+        let failed  = 0;
+        let skipped = 0;
+
+        for (const c of customers) {
+          const tier = getTier(c.totalSpent);
+          try {
+            const result = await ensureRankRole(i.guild, c.discordId, tier, 'Bulk rank sync');
+            if (result) updated++;
+            else skipped++;
+          } catch {
+            failed++;
+          }
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(THEME_COLOR)
+          .setAuthor({ name: 'Rank Sync Complete', iconURL: LOGO_URL })
+          .setTitle('🔄 Bulk Rank Assignment')
+          .setDescription([
+            `**Total customers:** ${customers.length}`,
+            `**Roles updated:** ${updated}`,
+            `**Already correct:** ${skipped}`,
+            failed > 0 ? `**Failed:** ${failed} _(member may have left server)_` : ''
+          ].filter(Boolean).join('\n'))
+          .setFooter({ text: `Triggered by ${i.user.username}`, iconURL: LOGO_URL })
+          .setTimestamp();
+
+        await i.editReply({ embeds: [embed] });
+        log('syncranks', `Sync complete: ${updated} updated, ${skipped} skipped, ${failed} failed`);
+      } catch (err) {
+        log('syncranks', `Error: ${err.message}`);
+        await i.editReply({ content: `Sync failed: ${err.message}` });
       }
       return;
     }

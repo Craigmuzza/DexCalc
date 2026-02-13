@@ -119,7 +119,13 @@ async function deploySlash(client) {
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .toJSON();
 
-    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue];
+    const syncranks = new SlashCommandBuilder()
+      .setName('syncranks')
+      .setDescription('Bulk-assign rank roles to all customers (staff only)')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks];
 
     console.log(`[deploy] GUILD_IDS: ${GUILD_IDS.join(', ') || '(none — global)'}`);
 
