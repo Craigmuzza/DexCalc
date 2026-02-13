@@ -40,7 +40,7 @@ const BANNER_URL    = 'https://i.ibb.co/7xwxnNpP/banner.gif';
 const WATERMARK_URL = 'https://i.ibb.co/b59Hb5c0/PPwatermarkletters.png';
 
 // ───────── Theme ─────────
-const THEME_RED = 0xff0000;
+const THEME_COLOR = 0x9b59b6; // Occult Mafia purple
 
 // ───────── Domain Constants ─────────
 const VALID_SKILLS  = ['Strength', 'Ranged', 'Magic', 'Hitpoints', 'Attack', 'Defence', 'Prayer'];
@@ -134,7 +134,7 @@ module.exports = {
   LOGO_URL,
   BANNER_URL,
   WATERMARK_URL,
-  THEME_RED,
+  THEME_COLOR,
   VALID_SKILLS,
   DAILY_CAP_XP,
   ZEAL_PER_HOUR,

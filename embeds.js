@@ -1,6 +1,6 @@
 // embeds.js — All Discord embed builders
 const { EmbedBuilder } = require('discord.js');
-const { THEME_RED, LOGO_URL, BANNER_URL, WATERMARK_URL, VALID_SKILLS } = require('./config');
+const { THEME_COLOR, LOGO_URL, BANNER_URL, WATERMARK_URL, VALID_SKILLS } = require('./config');
 const {
   fmtInt,
   formatDHMS,
@@ -57,7 +57,7 @@ function buildInfoEmbed(interaction, { skill, startXP, targetLevel, acctType, rs
 
   if (!result.ok) {
     const base = new EmbedBuilder()
-      .setColor(THEME_RED)
+      .setColor(THEME_COLOR)
       .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
       .setThumbnail(WATERMARK_URL)
       .setFooter(baseFooter(interaction.user));
@@ -82,7 +82,7 @@ function buildInfoEmbed(interaction, { skill, startXP, targetLevel, acctType, rs
   const titleRsn = rsn ? ` (${rsn})` : '';
 
   const embed = new EmbedBuilder()
-    .setColor(THEME_RED)
+    .setColor(THEME_COLOR)
     .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
     .setTitle(`${emoji} ${skill}${titleRsn}: ${fmtInt(startXP)} XP → level ${targetLevel}`)
     .setDescription([
@@ -116,7 +116,7 @@ function buildBannerEmbed() {
 // ───────── Payment Embed ─────────
 function buildPaymentEmbed(interaction) {
   return new EmbedBuilder()
-    .setColor(THEME_RED)
+    .setColor(THEME_COLOR)
     .setAuthor({ name: 'Payment Info', iconURL: LOGO_URL })
     .setTitle('💳 Payment Methods')
     .setThumbnail(WATERMARK_URL)
@@ -138,7 +138,7 @@ function buildPaymentEmbed(interaction) {
 // ───────── Ticket Created Embed (ephemeral) ─────────
 function buildTicketCreatedEmbed(interaction, channelUrl) {
   return new EmbedBuilder()
-    .setColor(THEME_RED)
+    .setColor(THEME_COLOR)
     .setAuthor({ name: 'Ticket Created', iconURL: LOGO_URL })
     .setDescription(`Your ticket is ready: ${channelUrl}`)
     .setFooter(baseFooter(interaction.user));
@@ -147,7 +147,7 @@ function buildTicketCreatedEmbed(interaction, channelUrl) {
 // ───────── Launcher Embed (/swcalc initial) ─────────
 function buildLauncherEmbed(interaction) {
   return new EmbedBuilder()
-    .setColor(THEME_RED)
+    .setColor(THEME_COLOR)
     .setAuthor({ name: 'Soul Wars Calculator', iconURL: LOGO_URL })
     .setTitle('Soul Wars Calculator')
     .setDescription([
@@ -181,7 +181,7 @@ function buildQuoteEmbed(interaction, rsn, acctType, targetLevel, quote) {
     : '';
 
   const embed = new EmbedBuilder()
-    .setColor(THEME_RED)
+    .setColor(THEME_COLOR)
     .setAuthor({ name: 'Soul Wars Multi-Skill Quote', iconURL: LOGO_URL })
     .setTitle(`📋 Full Quote for ${rsn}`)
     .setDescription([

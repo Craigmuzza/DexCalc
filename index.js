@@ -17,7 +17,7 @@ const http = require('http');
 const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 
 // ───────── Modules ─────────
-const { TOKEN, DEPLOY_SLASH, VALID_SKILLS, THEME_RED, LOGO_URL, WATERMARK_URL, PAID_COMMAND_ROLES, SUPPORT_ROLE_ID } = require('./config');
+const { TOKEN, DEPLOY_SLASH, VALID_SKILLS, THEME_COLOR, LOGO_URL, WATERMARK_URL, PAID_COMMAND_ROLES, SUPPORT_ROLE_ID } = require('./config');
 const { getPlayerStats }      = require('./hiscores');
 const { deploySlash }         = require('./deploy');
 const {
@@ -329,7 +329,7 @@ client.on('interactionCreate', async i => {
           : '🏆 Max tier reached!';
 
         const embed = new EmbedBuilder()
-          .setColor(THEME_RED)
+          .setColor(THEME_COLOR)
           .setAuthor({ name: 'Customer Profile', iconURL: LOGO_URL })
           .setTitle(`${tier.emoji} ${customer.displayName || customer.username}`)
           .setDescription([
@@ -382,7 +382,7 @@ client.on('interactionCreate', async i => {
         const tier = customer.tierObj;
 
         const embed = new EmbedBuilder()
-          .setColor(THEME_RED)
+          .setColor(THEME_COLOR)
           .setAuthor({ name: 'Total Spent', iconURL: LOGO_URL })
           .setTitle(`${tier.emoji} ${targetUser.username}`)
           .setDescription([
@@ -430,7 +430,7 @@ client.on('interactionCreate', async i => {
         const payingCustomers = customers.filter(c => c.totalSpent > 0).length;
 
         const embed = new EmbedBuilder()
-          .setColor(THEME_RED)
+          .setColor(THEME_COLOR)
           .setAuthor({ name: 'Customer Leaderboard', iconURL: LOGO_URL })
           .setTitle('🏆 Top Spenders')
           .setDescription(lines.join('\n'))
@@ -483,7 +483,7 @@ client.on('interactionCreate', async i => {
         }
 
         const embed = new EmbedBuilder()
-          .setColor(THEME_RED)
+          .setColor(THEME_COLOR)
           .setAuthor({ name: 'Revenue Dashboard', iconURL: LOGO_URL })
           .setTitle('💵 Revenue Breakdown')
           .setDescription([
