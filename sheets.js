@@ -136,20 +136,14 @@ async function ensureHeaders() {
     } catch (e) { /* ignore */ }
   }
 
-  // CRM headers
+  // CRM headers — always overwrite to keep in sync with code
   const endCol = colLetter(CRM_COL_COUNT - 1);
-  const crmH = await sheets.spreadsheets.values.get({
+  await sheets.spreadsheets.values.update({
     spreadsheetId: SPREADSHEET_ID,
-    range: `'${CRM_SHEET}'!A1:${endCol}1`
+    range: `'${CRM_SHEET}'!A1:${endCol}1`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [CRM_HEADERS] }
   });
-  if (!crmH.data.values || !crmH.data.values.length || crmH.data.values[0].length < CRM_COL_COUNT) {
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `'${CRM_SHEET}'!A1:${endCol}1`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [CRM_HEADERS] }
-    });
-  }
 
   // Transaction headers
   const txH = await sheets.spreadsheets.values.get({
