@@ -5,3 +5,5 @@ DexCalc.git/
 npm-debug.log
 ticket_counter.json
 active_tickets.json
+service-account-key.json
+*-credentials.json
