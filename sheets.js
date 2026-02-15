@@ -269,11 +269,18 @@ async function addCustomer(discordId, username, displayName) {
 
     const sheets = await getSheets();
     const endCol = colLetter(CRM_COL_COUNT - 1);
-    await sheets.spreadsheets.values.append({
+
+    // Find the exact next empty row (don't rely on append which can misplace data)
+    const colA = await sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: `'${CRM_SHEET}'!A:${endCol}`,
+      range: `'${CRM_SHEET}'!A:A`
+    });
+    const nextRow = (colA.data.values || []).length + 1;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `'${CRM_SHEET}'!A${nextRow}:${endCol}${nextRow}`,
       valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
       requestBody: { values: [buildCRMRow(data)] }
     });
 
@@ -489,6 +496,14 @@ async function getRevenueStats() {
   };
 }
 
+// ───────── Get CRM Sheet ID (for row delete operations) ─────────
+async function getCRMSheetId() {
+  const sheets = await getSheets();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+  const crmSheet = meta.data.sheets.find(s => s.properties.title === CRM_SHEET);
+  return crmSheet ? crmSheet.properties.sheetId : 0;
+}
+
 // ───────── Refresh All CRM Data (dedup + recalculate ranks, status, days inactive) ─────────
 async function refreshAllCRM() {
   const sheets = await getSheets();
@@ -501,52 +516,61 @@ async function refreshAllCRM() {
   const rows = res.data.values || [];
   if (rows.length <= 1) return 0;
 
-  // ─── Step 1: Deduplicate (keep the row with the highest totalSpent) ───
+  // ─── Step 1: Find duplicates AND blank rows to delete ───
   const seen = new Map(); // discordId → { bestIdx, bestSpent }
-  const dupeRows = [];    // 0-based indices of duplicate rows to clear
+  const rowsToDelete = []; // 0-based sheet row indices to delete
 
   for (let i = 1; i < rows.length; i++) {
-    const discordId = rows[i][0];
-    if (!discordId) continue;
+    const discordId = (rows[i][0] || '').trim();
+
+    // Mark blank/empty rows for deletion
+    if (!discordId) {
+      rowsToDelete.push(i);
+      continue;
+    }
+
     const spent = parseFloat(rows[i][3]) || 0;
 
     if (seen.has(discordId)) {
       const prev = seen.get(discordId);
       if (spent > prev.bestSpent) {
-        // This row is better — mark the previous one as dupe
-        dupeRows.push(prev.bestIdx);
+        rowsToDelete.push(prev.bestIdx);
         seen.set(discordId, { bestIdx: i, bestSpent: spent });
       } else {
-        // This row is the dupe
-        dupeRows.push(i);
+        rowsToDelete.push(i);
       }
     } else {
       seen.set(discordId, { bestIdx: i, bestSpent: spent });
     }
   }
 
-  // Clear duplicate rows (write empty values)
-  if (dupeRows.length) {
-    const clearRequests = dupeRows.map(idx => ({
-      range: `'${CRM_SHEET}'!A${idx + 1}:${endCol}${idx + 1}`,
-      values: [new Array(CRM_COL_COUNT).fill('')]
+  // Actually DELETE the rows (not clear — avoids confusing the append API)
+  if (rowsToDelete.length) {
+    const sheetId = await getCRMSheetId();
+    // Sort descending so deleting from bottom doesn't shift indices
+    rowsToDelete.sort((a, b) => b - a);
+    const deleteRequests = rowsToDelete.map(idx => ({
+      deleteDimension: {
+        range: { sheetId, dimension: 'ROWS', startIndex: idx, endIndex: idx + 1 }
+      }
     }));
-    await sheets.spreadsheets.values.batchUpdate({
+    await sheets.spreadsheets.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
-      requestBody: { valueInputOption: 'RAW', data: clearRequests }
+      requestBody: { requests: deleteRequests }
     });
-    console.log(`[sheets] Removed ${dupeRows.length} duplicate row(s)`);
+    console.log(`[sheets] Deleted ${rowsToDelete.length} duplicate/blank row(s)`);
   }
 
-  // ─── Step 2: Re-read and refresh all remaining rows ───
-  const res2 = dupeRows.length
-    ? await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${CRM_SHEET}'!A:${endCol}` })
-    : res;
+  // ─── Step 2: Re-read clean sheet and refresh all rows ───
+  const res2 = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `'${CRM_SHEET}'!A:${endCol}`
+  });
   const freshRows = res2.data.values || [];
 
   const updates = [];
   for (let i = 1; i < freshRows.length; i++) {
-    if (!freshRows[i][0]) continue; // skip cleared rows
+    if (!freshRows[i][0]) continue;
     const customer = parseCRMRow(freshRows[i], i + 1);
     const freshRow = buildCRMRow(customer);
     updates.push({

@@ -187,11 +187,10 @@ client.on('guildMemberAdd', async member => {
     if (result.isNew) {
       log('sheets', `Auto-added new member: ${member.user.username} (${member.id})`);
     }
-    // Assign their rank role (Street Runner for new, or existing rank if returning)
-    const customer = await getCustomer(member.id);
-    if (customer) {
-      await ensureRankRole(member.guild, member.id, customer.tierObj, 'New member join');
-    }
+    // Assign their rank role based on spend (Street Runner for new, or existing rank if returning)
+    const totalSpent = result.totalSpent || 0;
+    const tier = getTier(totalSpent);
+    await ensureRankRole(member.guild, member.id, tier, 'New member join');
   } catch (err) {
     log('sheets', `Failed to auto-add ${member.user.username}: ${err.message}`);
   }
