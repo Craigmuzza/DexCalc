@@ -224,45 +224,64 @@ async function findCustomer(discordId) {
   return null;
 }
 
+// ───────── Mutex for addCustomer (prevent duplicate rows from race conditions) ─────────
+const pendingAdds = new Set();
+
 // ───────── Add Customer (auto-add on join / first interaction) ─────────
 async function addCustomer(discordId, username, displayName) {
-  const existing = await findCustomer(discordId);
-  if (existing) {
-    // Update username/display name if changed
-    const sheets = await getSheets();
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `'${CRM_SHEET}'!B${existing.rowIndex}:C${existing.rowIndex}`,
-      valueInputOption: 'RAW',
-      requestBody: { values: [[username, displayName]] }
-    });
-    return { isNew: false, ...existing };
+  const id = String(discordId);
+
+  // Prevent concurrent adds for the same user
+  if (pendingAdds.has(id)) {
+    // Another call is already adding this user — wait briefly then find them
+    await new Promise(r => setTimeout(r, 2000));
+    const existing = await findCustomer(id);
+    return existing ? { isNew: false, ...existing } : { isNew: false };
   }
 
-  const data = {
-    discordId: String(discordId),
-    username,
-    displayName,
-    totalSpent: 0,
-    purchaseCount: 0,
-    firstPurchase: '',
-    lastPurchaseDate: '',
-    lastPurchaseAmt: 0,
-    lastPurchaseNote: '',
-    joinDate: nowISO()
-  };
+  pendingAdds.add(id);
+  try {
+    const existing = await findCustomer(id);
+    if (existing) {
+      // Update username/display name if changed
+      const sheets = await getSheets();
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SPREADSHEET_ID,
+        range: `'${CRM_SHEET}'!B${existing.rowIndex}:C${existing.rowIndex}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[username, displayName]] }
+      });
+      return { isNew: false, ...existing };
+    }
 
-  const sheets = await getSheets();
-  const endCol = colLetter(CRM_COL_COUNT - 1);
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `'${CRM_SHEET}'!A:${endCol}`,
-    valueInputOption: 'RAW',
-    insertDataOption: 'INSERT_ROWS',
-    requestBody: { values: [buildCRMRow(data)] }
-  });
+    const data = {
+      discordId: id,
+      username,
+      displayName,
+      totalSpent: 0,
+      purchaseCount: 0,
+      firstPurchase: '',
+      lastPurchaseDate: '',
+      lastPurchaseAmt: 0,
+      lastPurchaseNote: '',
+      joinDate: nowISO()
+    };
 
-  return { isNew: true, ...data, tier: '🆕 New', status: 'New' };
+    const sheets = await getSheets();
+    const endCol = colLetter(CRM_COL_COUNT - 1);
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `'${CRM_SHEET}'!A:${endCol}`,
+      valueInputOption: 'RAW',
+      insertDataOption: 'INSERT_ROWS',
+      requestBody: { values: [buildCRMRow(data)] }
+    });
+
+    const tier = getTier(0);
+    return { isNew: true, ...data, tier: `${tier.emoji} ${tier.name}`, status: 'New' };
+  } finally {
+    pendingAdds.delete(id);
+  }
 }
 
 // ───────── Record Payment ─────────
@@ -470,7 +489,7 @@ async function getRevenueStats() {
   };
 }
 
-// ───────── Refresh All CRM Data (recalculate tiers, status, days inactive) ─────────
+// ───────── Refresh All CRM Data (dedup + recalculate ranks, status, days inactive) ─────────
 async function refreshAllCRM() {
   const sheets = await getSheets();
   const endCol = colLetter(CRM_COL_COUNT - 1);
@@ -482,9 +501,53 @@ async function refreshAllCRM() {
   const rows = res.data.values || [];
   if (rows.length <= 1) return 0;
 
-  const updates = [];
+  // ─── Step 1: Deduplicate (keep the row with the highest totalSpent) ───
+  const seen = new Map(); // discordId → { bestIdx, bestSpent }
+  const dupeRows = [];    // 0-based indices of duplicate rows to clear
+
   for (let i = 1; i < rows.length; i++) {
-    const customer = parseCRMRow(rows[i], i + 1);
+    const discordId = rows[i][0];
+    if (!discordId) continue;
+    const spent = parseFloat(rows[i][3]) || 0;
+
+    if (seen.has(discordId)) {
+      const prev = seen.get(discordId);
+      if (spent > prev.bestSpent) {
+        // This row is better — mark the previous one as dupe
+        dupeRows.push(prev.bestIdx);
+        seen.set(discordId, { bestIdx: i, bestSpent: spent });
+      } else {
+        // This row is the dupe
+        dupeRows.push(i);
+      }
+    } else {
+      seen.set(discordId, { bestIdx: i, bestSpent: spent });
+    }
+  }
+
+  // Clear duplicate rows (write empty values)
+  if (dupeRows.length) {
+    const clearRequests = dupeRows.map(idx => ({
+      range: `'${CRM_SHEET}'!A${idx + 1}:${endCol}${idx + 1}`,
+      values: [new Array(CRM_COL_COUNT).fill('')]
+    }));
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: { valueInputOption: 'RAW', data: clearRequests }
+    });
+    console.log(`[sheets] Removed ${dupeRows.length} duplicate row(s)`);
+  }
+
+  // ─── Step 2: Re-read and refresh all remaining rows ───
+  const res2 = dupeRows.length
+    ? await sheets.spreadsheets.values.get({ spreadsheetId: SPREADSHEET_ID, range: `'${CRM_SHEET}'!A:${endCol}` })
+    : res;
+  const freshRows = res2.data.values || [];
+
+  const updates = [];
+  for (let i = 1; i < freshRows.length; i++) {
+    if (!freshRows[i][0]) continue; // skip cleared rows
+    const customer = parseCRMRow(freshRows[i], i + 1);
     const freshRow = buildCRMRow(customer);
     updates.push({
       range: `'${CRM_SHEET}'!A${i + 1}:${endCol}${i + 1}`,
@@ -495,10 +558,7 @@ async function refreshAllCRM() {
   if (updates.length) {
     await sheets.spreadsheets.values.batchUpdate({
       spreadsheetId: SPREADSHEET_ID,
-      requestBody: {
-        valueInputOption: 'RAW',
-        data: updates
-      }
+      requestBody: { valueInputOption: 'RAW', data: updates }
     });
   }
 
