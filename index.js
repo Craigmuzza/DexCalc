@@ -4,6 +4,7 @@
 // Commands:
 //   /swcalc      — Single-skill calculator with modal input
 //   /swquote     — Multi-skill quote from RSN lookup
+//   /payment     — Payment instructions (BTC, LTC, ETH, PayPal, Wise, GP)
 //   /paid        — Record a customer payment → Google Sheets (staff only)
 //   /refund      — Record a customer refund (staff only)
 //   /customer    — Full CRM profile for a customer
@@ -17,7 +18,7 @@ const http = require('http');
 const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 
 // ───────── Modules ─────────
-const { TOKEN, DEPLOY_SLASH, VALID_SKILLS, THEME_COLOR, LOGO_URL, WATERMARK_URL, PAID_COMMAND_ROLES, SUPPORT_ROLE_ID } = require('./config');
+const { TOKEN, DEPLOY_SLASH, VALID_SKILLS, THEME_COLOR, LOGO_URL, WATERMARK_URL, PAID_COMMAND_ROLES, SUPPORT_ROLE_ID, PAYMENT_METHODS } = require('./config');
 const { getPlayerStats }      = require('./hiscores');
 const { deploySlash }         = require('./deploy');
 const {
@@ -611,6 +612,32 @@ client.on('interactionCreate', async i => {
         log('syncranks', `Error: ${err.message}`);
         await i.editReply({ content: `Sync failed: ${err.message}` });
       }
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // /payment — Payment method instructions
+    // ─────────────────────────────────────────────────────────
+    if (i.isChatInputCommand() && i.commandName === 'payment') {
+      await i.deferReply();
+
+      const method = i.options.getString('method');
+      const info = PAYMENT_METHODS[method];
+
+      if (!info) {
+        return i.editReply({ content: 'Unknown payment method.' });
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setAuthor({ name: 'Payment Instructions', iconURL: LOGO_URL })
+        .setTitle(`${info.emoji} ${info.title}`)
+        .addFields(info.fields)
+        .setThumbnail(WATERMARK_URL)
+        .setFooter({ text: `Requested by ${i.user.username}`, iconURL: LOGO_URL })
+        .setTimestamp();
+
+      await i.editReply({ embeds: [embed] });
       return;
     }
 

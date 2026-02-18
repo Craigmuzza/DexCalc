@@ -125,7 +125,24 @@ async function deploySlash(client) {
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .toJSON();
 
-    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks];
+    const payment = new SlashCommandBuilder()
+      .setName('payment')
+      .setDescription('Get payment instructions for a specific method')
+      .addStringOption(opt =>
+        opt.setName('method')
+          .setDescription('Payment method')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Bitcoin (BTC)', value: 'BTC' },
+            { name: 'Litecoin (LTC)', value: 'LTC' },
+            { name: 'Ethereum (ETH)', value: 'ETH' },
+            { name: 'PayPal', value: 'PayPal' },
+            { name: 'Wise', value: 'Wise' },
+            { name: 'GP (In-Game)', value: 'GP' }
+          ))
+      .toJSON();
+
+    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks, payment];
 
     console.log(`[deploy] GUILD_IDS: ${GUILD_IDS.join(', ') || '(none — global)'}`);
 

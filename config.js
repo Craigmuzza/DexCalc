@@ -132,6 +132,91 @@ const SKILL_EMOJIS = {
   Prayer:    '🙏'
 };
 
+// ───────── Payment Methods (for /payment command) ─────────
+const PAYMENT_METHODS = {
+  BTC: {
+    title: 'Bitcoin (BTC)',
+    emoji: '₿',
+    fields: [
+      { name: 'Address', value: '`1GDgLnZBjxdStZYVq9hc8repSy4NcrfB9u`', inline: false },
+      { name: 'Network', value: 'Bitcoin', inline: true },
+      { name: 'After paying', value: 'Send screenshot/txid after paying', inline: false }
+    ]
+  },
+  LTC: {
+    title: 'Litecoin (LTC)',
+    emoji: 'Ł',
+    fields: [
+      { name: 'Address', value: '`MUqCwFcpig9Cyu5sUBjDWdnoByqQfDsA66`', inline: false },
+      { name: 'Network', value: 'Litecoin', inline: true },
+      { name: 'After paying', value: 'Send screenshot/txid after paying', inline: false }
+    ]
+  },
+  ETH: {
+    title: 'Ethereum (ETH)',
+    emoji: 'Ξ',
+    fields: [
+      { name: 'Address', value: '`0xf0a26fcc058881a6438e01eb26a9a02305cf3fce`', inline: false },
+      { name: 'Network', value: 'Ethereum', inline: true },
+      { name: 'After paying', value: 'Send screenshot/txid after paying', inline: false }
+    ]
+  },
+  PayPal: {
+    title: 'PayPal',
+    emoji: '💳',
+    fields: [
+      { name: 'Link', value: 'http://paypal.me/lennycooper', inline: false },
+      { name: 'After paying', value: 'Send screenshot after paying', inline: false }
+    ]
+  },
+  Wise: {
+    title: 'Wise',
+    emoji: '💸',
+    fields: [
+      { name: 'Link', value: 'https://wise.com/pay/me/lennyc96', inline: false },
+      { name: 'After paying', value: 'Send screenshot after paying', inline: false }
+    ]
+  },
+  GP: {
+    title: 'GP (In-Game)',
+    emoji: '🪙',
+    fields: [
+      {
+        name: 'IF PAYING WITH GP',
+        value: [
+          '• Go to **World 424**',
+          '• Travel to **Rimmington POH Portal**',
+          '• Select **"Friend\'s House"**',
+          '• Enter RSN: **De xx**',
+          '• Use the **Tip Jar** inside the house to send the agreed GP amount',
+          '',
+          '⚠️ **Do not send GP anywhere else.** All payments go through the Tip Jar only.'
+        ].join('\n'),
+        inline: false
+      },
+      {
+        name: 'IF RECEIVING GP',
+        value: [
+          '• Be on **World 424**',
+          '• Go to **Rimmington POH Portal**',
+          '• Build a **Tip Jar** in your POH (requires 40 Construction)',
+          '→ https://oldschool.runescape.wiki/w/Tip_jar',
+          '• Set **Private Chat to ON**',
+          '• Send me your RSN once ready',
+          '',
+          'I will join your house and complete the transfer via the Tip Jar.'
+        ].join('\n'),
+        inline: false
+      },
+      {
+        name: 'Why We Use the Tip Jar',
+        value: 'The Tip Jar is a Jagex-implemented in-game wealth transfer method. It is a built-in mechanic within Old School RuneScape, and in our experience, we have not received any Real World Trading (RWT) bans when using this method. For consistency and safety, all GP transactions are handled this way.',
+        inline: false
+      }
+    ]
+  }
+};
+
 module.exports = {
   TOKEN,
   DEPLOY_SLASH,
@@ -153,5 +238,6 @@ module.exports = {
   SW_RATES,
   OSRS_XP_TABLE,
   SKILL_EMOJIS,
-  CUSTOMER_TIERS
+  CUSTOMER_TIERS,
+  PAYMENT_METHODS
 };
