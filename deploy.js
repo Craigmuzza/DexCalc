@@ -138,6 +138,7 @@ async function deploySlash(client) {
             { name: 'Ethereum (ETH)', value: 'ETH' },
             { name: 'PayPal', value: 'PayPal' },
             { name: 'Wise', value: 'Wise' },
+            { name: 'Australian Bank Transfer', value: 'Aus_Bank_Transfer' },
             { name: 'GP (In-Game)', value: 'GP' }
           ))
       .toJSON();

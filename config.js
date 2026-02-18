@@ -177,6 +177,14 @@ const PAYMENT_METHODS = {
       { name: 'After paying', value: 'Send screenshot after paying', inline: false }
     ]
   },
+  Aus_Bank_Transfer: {
+    title: 'Australian Bank Transfer',
+    emoji: '🇦🇺',
+    fields: [
+      { name: 'PayID', value: '`0431 997 863`', inline: false },
+      { name: 'or', value: '**BSB:** 064-826\n**Account Number:** 1027 2788', inline: false }
+    ]
+  },
   GP: {
     title: 'GP (In-Game)',
     emoji: '🪙',
