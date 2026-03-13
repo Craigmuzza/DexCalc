@@ -760,7 +760,7 @@ client.on('interactionCreate', async i => {
       };
       const addr = addresses[method];
       if (!addr) return i.editReply({ content: 'Unknown payment method.' });
-      await i.editReply({ content: `\`${addr}\`` });
+      await i.editReply({ content: addr });
       return;
     }
 
@@ -775,7 +775,7 @@ client.on('interactionCreate', async i => {
       const info   = PAYMENT_METHODS[method];
       const btn    = info?.copyButtons?.[idx];
       if (!btn) return i.editReply({ content: 'Unknown payment method.' });
-      await i.editReply({ content: `\`${btn.value}\`` });
+      await i.editReply({ content: btn.value });
       return;
     }
 
