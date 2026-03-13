@@ -43,6 +43,7 @@ const {
 const {
   buildActionRow,
   buildToggleRow,
+  buildPaymentCopyRow,
   buildTicketEphemeralRow,
   buildLauncherRows,
   buildDisabledLauncherRows,
@@ -743,6 +744,22 @@ client.on('interactionCreate', async i => {
     }
 
     // ─────────────────────────────────────────────────────────
+    // Payment copy buttons (copypay|method)
+    // ─────────────────────────────────────────────────────────
+    if (i.isButton() && i.customId.startsWith('copypay|')) {
+      await i.deferReply({ ephemeral: true });
+      const method = i.customId.split('|')[1];
+      const addresses = {
+        btc:    'bc1qh4l4t9j2uu79g972r89m3cr2nf3wgg8kkz8xp7',
+        paypal: 'takedexosrs@gmail.com'
+      };
+      const addr = addresses[method];
+      if (!addr) return i.editReply({ content: 'Unknown payment method.' });
+      await i.editReply({ content: `\`${addr}\`` });
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────
     // Embed buttons (swv3|...|action)
     // ─────────────────────────────────────────────────────────
     if (i.isButton() && i.customId.startsWith('swv3|')) {
@@ -811,7 +828,7 @@ client.on('interactionCreate', async i => {
       // ── Payment Info ──
       if (action === 'pay') {
         await i.deferReply({ ephemeral: true });
-        await i.editReply({ embeds: [buildPaymentEmbed(i)] });
+        await i.editReply({ embeds: [buildPaymentEmbed(i)], components: [buildPaymentCopyRow()] });
         return;
       }
 

@@ -73,6 +73,20 @@ function buildToggleRow(ctx, activeView) {
   );
 }
 
+// Payment copy buttons — one button per copyable address
+function buildPaymentCopyRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('copypay|btc')
+      .setLabel('📋 Copy BTC Address')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('copypay|paypal')
+      .setLabel('📋 Copy PayPal')
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
 // Close ticket button row
 function buildCloseRow(userId) {
   return new ActionRowBuilder().addComponents(
@@ -205,6 +219,7 @@ module.exports = {
   buildNextButton,
   buildActionRow,
   buildToggleRow,
+  buildPaymentCopyRow,
   buildCloseRow,
   buildTicketEphemeralRow,
   buildLauncherRows,
