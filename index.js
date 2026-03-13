@@ -44,6 +44,7 @@ const {
   buildActionRow,
   buildToggleRow,
   buildPaymentCopyRow,
+  buildPaymentMethodCopyRow,
   buildTicketEphemeralRow,
   buildLauncherRows,
   buildDisabledLauncherRows,
@@ -638,7 +639,11 @@ client.on('interactionCreate', async i => {
         .setFooter({ text: `Requested by ${i.user.username}`, iconURL: LOGO_URL })
         .setTimestamp();
 
-      await i.editReply({ embeds: [embed] });
+      const replyPayload = { embeds: [embed] };
+      if (info.copyButtons?.length) {
+        replyPayload.components = [buildPaymentMethodCopyRow(method, info.copyButtons)];
+      }
+      await i.editReply(replyPayload);
       return;
     }
 
@@ -756,6 +761,21 @@ client.on('interactionCreate', async i => {
       const addr = addresses[method];
       if (!addr) return i.editReply({ content: 'Unknown payment method.' });
       await i.editReply({ content: `\`${addr}\`` });
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // /payment command copy buttons (copypayment|METHOD|INDEX)
+    // ─────────────────────────────────────────────────────────
+    if (i.isButton() && i.customId.startsWith('copypayment|')) {
+      await i.deferReply({ ephemeral: true });
+      const parts  = i.customId.split('|');
+      const method = parts[1];
+      const idx    = parseInt(parts[2], 10);
+      const info   = PAYMENT_METHODS[method];
+      const btn    = info?.copyButtons?.[idx];
+      if (!btn) return i.editReply({ content: 'Unknown payment method.' });
+      await i.editReply({ content: `\`${btn.value}\`` });
       return;
     }
 

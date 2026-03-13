@@ -73,6 +73,18 @@ function buildToggleRow(ctx, activeView) {
   );
 }
 
+// Copy row for /payment command embeds — built dynamically from config copyButtons
+function buildPaymentMethodCopyRow(method, copyButtons) {
+  return new ActionRowBuilder().addComponents(
+    ...copyButtons.map((btn, idx) =>
+      new ButtonBuilder()
+        .setCustomId(`copypayment|${method}|${idx}`)
+        .setLabel(btn.label)
+        .setStyle(ButtonStyle.Secondary)
+    )
+  );
+}
+
 // Payment copy buttons — one button per copyable address
 function buildPaymentCopyRow() {
   return new ActionRowBuilder().addComponents(
@@ -220,6 +232,7 @@ module.exports = {
   buildActionRow,
   buildToggleRow,
   buildPaymentCopyRow,
+  buildPaymentMethodCopyRow,
   buildCloseRow,
   buildTicketEphemeralRow,
   buildLauncherRows,

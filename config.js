@@ -141,6 +141,9 @@ const PAYMENT_METHODS = {
       { name: 'Address', value: '`1GDgLnZBjxdStZYVq9hc8repSy4NcrfB9u`', inline: false },
       { name: 'Network', value: 'Bitcoin', inline: true },
       { name: 'After paying', value: 'Send screenshot/txid after paying', inline: false }
+    ],
+    copyButtons: [
+      { label: '📋 Copy BTC Address', value: '1GDgLnZBjxdStZYVq9hc8repSy4NcrfB9u' }
     ]
   },
   LTC: {
@@ -150,6 +153,9 @@ const PAYMENT_METHODS = {
       { name: 'Address', value: '`MUqCwFcpig9Cyu5sUBjDWdnoByqQfDsA66`', inline: false },
       { name: 'Network', value: 'Litecoin', inline: true },
       { name: 'After paying', value: 'Send screenshot/txid after paying', inline: false }
+    ],
+    copyButtons: [
+      { label: '📋 Copy LTC Address', value: 'MUqCwFcpig9Cyu5sUBjDWdnoByqQfDsA66' }
     ]
   },
   ETH: {
@@ -159,6 +165,9 @@ const PAYMENT_METHODS = {
       { name: 'Address', value: '`0xf0a26fcc058881a6438e01eb26a9a02305cf3fce`', inline: false },
       { name: 'Network', value: 'Ethereum', inline: true },
       { name: 'After paying', value: 'Send screenshot/txid after paying', inline: false }
+    ],
+    copyButtons: [
+      { label: '📋 Copy ETH Address', value: '0xf0a26fcc058881a6438e01eb26a9a02305cf3fce' }
     ]
   },
   PayPal: {
@@ -167,6 +176,9 @@ const PAYMENT_METHODS = {
     fields: [
       { name: 'Link', value: 'http://paypal.me/lennycooper', inline: false },
       { name: 'After paying', value: 'Send screenshot after paying', inline: false }
+    ],
+    copyButtons: [
+      { label: '📋 Copy PayPal Link', value: 'paypal.me/lennycooper' }
     ]
   },
   Wise: {
@@ -175,6 +187,9 @@ const PAYMENT_METHODS = {
     fields: [
       { name: 'Link', value: 'https://wise.com/pay/me/lennyc96', inline: false },
       { name: 'After paying', value: 'Send screenshot after paying', inline: false }
+    ],
+    copyButtons: [
+      { label: '📋 Copy Wise Link', value: 'wise.com/pay/me/lennyc96' }
     ]
   },
   Aus_Bank_Transfer: {
@@ -183,6 +198,11 @@ const PAYMENT_METHODS = {
     fields: [
       { name: 'PayID', value: '`0431 997 863`', inline: false },
       { name: 'or', value: '**BSB:** 064-826\n**Account Number:** 1027 2788', inline: false }
+    ],
+    copyButtons: [
+      { label: '📋 Copy PayID', value: '0431 997 863' },
+      { label: '📋 Copy BSB', value: '064-826' },
+      { label: '📋 Copy Account No.', value: '1027 2788' }
     ]
   },
   GP: {
