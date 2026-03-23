@@ -45,6 +45,8 @@ const {
   buildToggleRow,
   buildPaymentCopyRow,
   buildPaymentMethodCopyRow,
+  buildRaffleTicketButton,
+  buildCloseRow,
   buildTicketEphemeralRow,
   buildLauncherRows,
   buildDisabledLauncherRows,
@@ -688,12 +690,12 @@ client.on('interactionCreate', async i => {
         ].join('\n'))
         .setTimestamp();
 
-      await i.channel.send({ embeds: [embed] });
+      await i.channel.send({ embeds: [embed], components: [buildRaffleTicketButton(raffle.id)] });
       await i.editReply({ content: `✅ Raffle **${title}** created! (${totalTickets} tickets, ${prizes.length} prize${prizes.length > 1 ? 's' : ''})` });
       return;
     }
 
-    // /rgive — Give tickets to a user
+    // /rgive — Give tickets to a user (posts update in raffle channel)
     if (i.isChatInputCommand() && i.commandName === 'rgive') {
       await i.deferReply({ ephemeral: true });
       const target = i.options.getUser('user');
@@ -703,12 +705,13 @@ client.on('interactionCreate', async i => {
       if (result.error === 'no_raffle') return i.editReply({ content: 'No active raffle. Use `/raffle` to create one.' });
       if (result.error === 'full')      return i.editReply({ content: `Raffle is full! (${result.raffle.soldCount}/${result.raffle.totalTickets} tickets sold)` });
 
-      await postTicketUpdate(i.channel, target.id, target.username, result);
+      const raffleChannel = i.guild.channels.cache.get(result.raffle.channelId) || i.channel;
+      await postTicketUpdate(raffleChannel, target.id, target.username, result);
       await i.editReply({ content: `✅ Gave **${result.tickets.length}** ticket${result.tickets.length > 1 ? 's' : ''} to ${target}.` });
       return;
     }
 
-    // /rtake — Remove tickets from a user
+    // /rtake — Remove tickets from a user (posts update in raffle channel)
     if (i.isChatInputCommand() && i.commandName === 'rtake') {
       await i.deferReply({ ephemeral: true });
       const target = i.options.getUser('user');
@@ -718,7 +721,8 @@ client.on('interactionCreate', async i => {
       if (result.error === 'no_raffle')  return i.editReply({ content: 'No active raffle.' });
       if (result.error === 'no_tickets') return i.editReply({ content: `${target} has no tickets in the active raffle.` });
 
-      await i.channel.send(
+      const raffleChannel = i.guild.channels.cache.get(result.raffle.channelId) || i.channel;
+      await raffleChannel.send(
         `🗑️ **${result.removed.length}** ticket${result.removed.length > 1 ? 's' : ''} removed from <@${target.id}>. ` +
         `(Tickets: ${result.removed.join(', ')})\n` +
         `**${result.soldCount}/${result.totalTickets}** tickets sold — (RAFFLE ID: ${result.raffle.id})`
@@ -727,19 +731,22 @@ client.on('interactionCreate', async i => {
       return;
     }
 
-    // /rcancel — Cancel the active raffle
+    // /rcancel — Cancel the active raffle (posts in raffle channel)
     if (i.isChatInputCommand() && i.commandName === 'rcancel') {
       await i.deferReply({ ephemeral: true });
+      const activeRaffle = getRaffle(i.guild.id);
       const title = cancelRaffle(i.guild.id);
       if (!title) return i.editReply({ content: 'No active raffle to cancel.' });
-      await i.channel.send(`📢 **${title}** was canceled!\n❌ Canceled`);
+      const raffleChannel = (activeRaffle && i.guild.channels.cache.get(activeRaffle.channelId)) || i.channel;
+      await raffleChannel.send(`📢 **${title}** was canceled!\n❌ Canceled`);
       await i.editReply({ content: `✅ Raffle **${title}** has been cancelled.` });
       return;
     }
 
-    // /rroll — Force roll winners now
+    // /rroll — Force roll winners now (posts in raffle channel)
     if (i.isChatInputCommand() && i.commandName === 'rroll') {
       await i.deferReply({ ephemeral: true });
+      const activeRaffle = getRaffle(i.guild.id);
       const result = rollWinners(i.guild.id);
       if (result.error === 'no_raffle')  return i.editReply({ content: 'No active raffle.' });
       if (result.error === 'no_tickets') return i.editReply({ content: 'No tickets have been sold yet.' });
@@ -752,7 +759,8 @@ client.on('interactionCreate', async i => {
         .setTitle('🏆 Raffle Winners 🏆')
         .setDescription(`🎉 **${result.raffle.title}** — (RAFFLE ID: ${result.raffle.id})\n\n${lines}`)
         .setTimestamp();
-      await i.channel.send({ embeds: [winEmbed] });
+      const raffleChannel = (activeRaffle && i.guild.channels.cache.get(activeRaffle.channelId)) || i.channel;
+      await raffleChannel.send({ embeds: [winEmbed] });
       await i.editReply({ content: '✅ Winners rolled!' });
       return;
     }
@@ -908,6 +916,60 @@ client.on('interactionCreate', async i => {
 
       const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType, rsn });
       await i.editReply(payload);
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Raffle "Buy Tickets" button → opens a support ticket
+    // ─────────────────────────────────────────────────────────
+    if (i.isButton() && i.customId.startsWith('raffle_buy|')) {
+      const raffleId = i.customId.split('|')[1];
+      const raffle   = getRaffle(i.guild.id);
+
+      if (!raffle || String(raffle.id) !== raffleId) {
+        await i.deferReply({ ephemeral: true });
+        return i.editReply({ content: 'This raffle is no longer active.' });
+      }
+
+      const existingChannelId = getActiveTicket(i.guild.id, i.user.id);
+      if (existingChannelId) {
+        const existing = i.guild.channels.cache.get(existingChannelId);
+        if (existing) {
+          await i.deferReply({ ephemeral: true });
+          return i.editReply({ content: `You already have an open ticket: ${existing}` });
+        }
+        removeActiveTicketByChannelId(existingChannelId);
+      }
+
+      await i.deferReply({ ephemeral: true });
+
+      const ordinals   = ['1st', '2nd', '3rd'];
+      const prizeLines = raffle.prizes.map((p, idx) => `( ${ordinals[idx] || `${idx + 1}th`} ) ➛ ${p}`).join('\n');
+
+      const raffleInfoEmbed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setAuthor({ name: '🎟️ Ticket Purchase Request', iconURL: LOGO_URL })
+        .setTitle(raffle.title)
+        .setDescription([
+          `Welcome! You're requesting tickets for **${raffle.title}**.`,
+          '',
+          `🎁 **Prizes:**\n${prizeLines}`,
+          '',
+          `🎟️ **${raffle.soldCount} / ${raffle.totalTickets}** tickets sold`,
+          '',
+          'Please tell us:\n• How many tickets you would like\n• Your preferred payment method',
+          '',
+          '_A staff member will confirm your payment and assign your tickets._'
+        ].join('\n'))
+        .setThumbnail(WATERMARK_URL)
+        .setFooter({ text: `RAFFLE ID: ${raffle.id}` });
+
+      const ch = await openTicketChannel(i, [raffleInfoEmbed], buildCloseRow(i.user.id));
+      addActiveTicket(i.guild.id, i.user.id, ch.id);
+
+      const createdEmbed = buildTicketCreatedEmbed(i, `<#${ch.id}>`);
+      const row = buildTicketEphemeralRow(ch.guild.id, ch.id, i.user.id);
+      await i.editReply({ embeds: [createdEmbed], components: [row] });
       return;
     }
 

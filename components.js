@@ -85,6 +85,16 @@ function buildPaymentMethodCopyRow(method, copyButtons) {
   );
 }
 
+// Raffle "Buy Tickets" button — opens a ticket for the customer
+function buildRaffleTicketButton(raffleId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`raffle_buy|${raffleId}`)
+      .setLabel('🎟️ Buy Tickets')
+      .setStyle(ButtonStyle.Success)
+  );
+}
+
 // Payment copy buttons — one button per copyable address
 function buildPaymentCopyRow() {
   return new ActionRowBuilder().addComponents(
@@ -233,6 +243,7 @@ module.exports = {
   buildToggleRow,
   buildPaymentCopyRow,
   buildPaymentMethodCopyRow,
+  buildRaffleTicketButton,
   buildCloseRow,
   buildTicketEphemeralRow,
   buildLauncherRows,
