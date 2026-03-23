@@ -153,6 +153,8 @@ async function deploySlash(client) {
       .addIntegerOption(opt =>
         opt.setName('tickets').setDescription('Total number of tickets').setRequired(true).setMinValue(1).setMaxValue(500))
       .addStringOption(opt =>
+        opt.setName('price').setDescription('Ticket price (e.g. 125m or $30)').setRequired(true).setMaxLength(40))
+      .addStringOption(opt =>
         opt.setName('prize1').setDescription('1st place prize').setRequired(true).setMaxLength(100))
       .addStringOption(opt =>
         opt.setName('prize2').setDescription('2nd place prize').setRequired(false).setMaxLength(100))

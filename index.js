@@ -673,13 +673,14 @@ client.on('interactionCreate', async i => {
 
       const title        = i.options.getString('title');
       const totalTickets = i.options.getInteger('tickets');
+      const price        = i.options.getString('price');
       const prizes       = [
         i.options.getString('prize1'),
         i.options.getString('prize2'),
         i.options.getString('prize3')
       ].filter(Boolean);
 
-      const raffle = createRaffle(i.guild.id, i.channel.id, title, totalTickets, prizes);
+      const raffle = createRaffle(i.guild.id, i.channel.id, title, totalTickets, price, prizes);
 
       const ordinals = ['1st', '2nd', '3rd'];
       const prizeLines = prizes.map((p, idx) => `( ${ordinals[idx] || `${idx + 1}th`} ) ➛ ${p}`).join('\n');
@@ -689,6 +690,8 @@ client.on('interactionCreate', async i => {
         .setTitle(`🎊 ${title} 🎊`)
         .setDescription([
           `🎟️ **${totalTickets} TICKETS AVAILABLE!** 🎟️`,
+          '',
+          `💰 **Ticket Price:** ${price}`,
           '',
           '_The Raffle Will Automatically Roll When The Last Ticket Is Sold._',
           '',
@@ -1213,6 +1216,8 @@ client.on('interactionCreate', async i => {
         .setTitle(raffle.title)
         .setDescription([
           `Welcome! You're requesting tickets for **${raffle.title}**.`,
+          '',
+          `💰 **Ticket Price:** ${raffle.price}`,
           '',
           `🎁 **Prizes:**\n${prizeLines}`,
           '',

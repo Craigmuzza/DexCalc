@@ -27,7 +27,7 @@ function getActive(guildId) {
   return r;
 }
 
-function createRaffle(guildId, channelId, title, totalTickets, prizes) {
+function createRaffle(guildId, channelId, title, totalTickets, price, prizes) {
   const data    = load();
   data.counter  = (data.counter || 0) + 1;
   data.active   = {
@@ -36,6 +36,7 @@ function createRaffle(guildId, channelId, title, totalTickets, prizes) {
     channelId,
     title,
     totalTickets,
+    price,
     prizes,
     nextTicketNum: 1,
     tickets:       {},   // userId -> [ticketNums]
