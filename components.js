@@ -85,6 +85,16 @@ function buildPaymentMethodCopyRow(method, copyButtons) {
   );
 }
 
+// Balloon drop "Buy Ticket" button — opens a ticket for the customer
+function buildBalloonTicketButton(eventId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`balloon_buy|${eventId}`)
+      .setLabel('🎈 Buy Ticket')
+      .setStyle(ButtonStyle.Success)
+  );
+}
+
 // Raffle "Buy Tickets" button — opens a ticket for the customer
 function buildRaffleTicketButton(raffleId) {
   return new ActionRowBuilder().addComponents(
@@ -243,6 +253,7 @@ module.exports = {
   buildToggleRow,
   buildPaymentCopyRow,
   buildPaymentMethodCopyRow,
+  buildBalloonTicketButton,
   buildRaffleTicketButton,
   buildCloseRow,
   buildTicketEphemeralRow,

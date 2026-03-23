@@ -198,7 +198,62 @@ async function deploySlash(client) {
       .setDescription('Show the current raffle status')
       .toJSON();
 
-    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks, payment, raffle, rgive, rtake, rcancel, rroll, rstatus];
+    // ─── Balloon Drop Commands ───
+
+    const balloon = new SlashCommandBuilder()
+      .setName('balloon')
+      .setDescription('Create a balloon drop party event (staff only)')
+      .addStringOption(opt =>
+        opt.setName('title').setDescription('Event title').setRequired(true).setMaxLength(80))
+      .addIntegerOption(opt =>
+        opt.setName('tickets').setDescription('Max attendees').setRequired(true).setMinValue(1).setMaxValue(200))
+      .addStringOption(opt =>
+        opt.setName('price').setDescription('Ticket price (e.g. 125m or $30)').setRequired(true).setMaxLength(40))
+      .addStringOption(opt =>
+        opt.setName('event_time').setDescription('When the event is (e.g. Saturday 8pm AEST)').setRequired(true).setMaxLength(80))
+      .addIntegerOption(opt =>
+        opt.setName('world').setDescription('Which world').setRequired(true).setMinValue(300).setMaxValue(600))
+      .addStringOption(opt =>
+        opt.setName('items').setDescription('What is being dropped (e.g. Twisted Bow, 500m cash, Scythe)').setRequired(true).setMaxLength(200))
+      .addIntegerOption(opt =>
+        opt.setName('balloons').setDescription('Number of filled balloons (out of 200 in the room)').setRequired(false).setMinValue(1).setMaxValue(200))
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const bgive = new SlashCommandBuilder()
+      .setName('bgive')
+      .setDescription('Confirm payment and give a balloon event ticket (staff only)')
+      .addUserOption(opt =>
+        opt.setName('user').setDescription('User to give a spot to').setRequired(true))
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const btake = new SlashCommandBuilder()
+      .setName('btake')
+      .setDescription('Remove a user from the balloon event (staff only)')
+      .addUserOption(opt =>
+        opt.setName('user').setDescription('User to remove').setRequired(true))
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const bcancel = new SlashCommandBuilder()
+      .setName('bcancel')
+      .setDescription('Cancel the active balloon event (staff only)')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const bstatus = new SlashCommandBuilder()
+      .setName('bstatus')
+      .setDescription('Show current balloon event status and attendee list')
+      .toJSON();
+
+    const bannounce = new SlashCommandBuilder()
+      .setName('bannounce')
+      .setDescription('Post a day-of reminder pinging all ticket holders (staff only)')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks, payment, raffle, rgive, rtake, rcancel, rroll, rstatus, balloon, bgive, btake, bcancel, bstatus, bannounce];
 
     console.log(`[deploy] GUILD_IDS: ${GUILD_IDS.join(', ') || '(none — global)'}`);
 

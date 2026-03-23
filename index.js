@@ -45,6 +45,7 @@ const {
   buildToggleRow,
   buildPaymentCopyRow,
   buildPaymentMethodCopyRow,
+  buildBalloonTicketButton,
   buildRaffleTicketButton,
   buildCloseRow,
   buildTicketEphemeralRow,
@@ -61,6 +62,13 @@ const {
   rollWinners,
   cancelRaffle
 } = require('./raffle');
+const {
+  getActive:      getBalloonEvent,
+  createEvent:    createBalloonEvent,
+  giveTicket:     giveBalloonTicket,
+  takeTicket:     takeBalloonTicket,
+  cancelEvent:    cancelBalloonEvent
+} = require('./balloon');
 const {
   addActiveTicket,
   getActiveTicket,
@@ -789,6 +797,164 @@ client.on('interactionCreate', async i => {
       return;
     }
 
+    // ─────────────────────────────────────────────────────────
+    // Balloon Drop Commands
+    // ─────────────────────────────────────────────────────────
+
+    // /balloon — Create a balloon drop event
+    if (i.isChatInputCommand() && i.commandName === 'balloon') {
+      await i.deferReply({ ephemeral: true });
+      if (getBalloonEvent(i.guild.id)) return i.editReply({ content: 'There is already an active balloon event. Use `/bcancel` first.' });
+
+      const title        = i.options.getString('title');
+      const totalTickets = i.options.getInteger('tickets');
+      const price        = i.options.getString('price');
+      const eventTime    = i.options.getString('event_time');
+      const world        = i.options.getInteger('world');
+      const items        = i.options.getString('items');
+      const balloons     = i.options.getInteger('balloons');
+
+      const event = createBalloonEvent(i.guild.id, i.channel.id, title, totalTickets, price, eventTime, world, items, balloons);
+
+      const itemLines = items.split(',').map(s => `• ${s.trim()}`).join('\n');
+      const balloonLine = balloons ? `🎈 **${balloons} filled balloons** (out of 200 in the room)\n` : '';
+
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setTitle(`🎈 ${title} 🎈`)
+        .setDescription([
+          `🎟️ **${totalTickets} SPOTS AVAILABLE** 🎟️`,
+          '',
+          `📅 **When:** ${eventTime}`,
+          `🌍 **World:** ${world}`,
+          `💰 **Ticket Price:** ${price}`,
+          '',
+          balloonLine + `🎁 **Items Being Dropped:**\n${itemLines}`,
+          '',
+          '_Secure your spot by clicking the button below. A ticket will open and staff will confirm your payment._',
+          '',
+          `*(EVENT ID: ${event.id})*`
+        ].join('\n'))
+        .setThumbnail(WATERMARK_URL)
+        .setTimestamp();
+
+      await i.channel.send({ embeds: [embed], components: [buildBalloonTicketButton(event.id)] });
+      await i.editReply({ content: `✅ Balloon event **${title}** created! (${totalTickets} spots, World ${world}, ${eventTime})` });
+      return;
+    }
+
+    // /bgive — Confirm payment and give a spot
+    if (i.isChatInputCommand() && i.commandName === 'bgive') {
+      await i.deferReply({ ephemeral: true });
+      const target = i.options.getUser('user');
+      const result = giveBalloonTicket(i.guild.id, target.id);
+
+      if (result.error === 'no_event')         return i.editReply({ content: 'No active balloon event. Use `/balloon` to create one.' });
+      if (result.error === 'already_has_ticket') return i.editReply({ content: `${target} already has a spot in this event.` });
+      if (result.error === 'full')              return i.editReply({ content: `Event is full! (${result.event.attendees.length}/${result.event.totalTickets} spots taken)` });
+
+      const event = result.event;
+      const soldCount = event.attendees.length;
+      const eventChannel = i.guild.channels.cache.get(event.channelId) || i.channel;
+
+      await eventChannel.send(
+        `🎈 <@${target.id}> has secured a spot!\n` +
+        `**${soldCount} / ${event.totalTickets}** spots filled — (EVENT ID: ${event.id})`
+      );
+      await i.editReply({ content: `✅ Spot confirmed for ${target}. (${soldCount}/${event.totalTickets} filled)` });
+      return;
+    }
+
+    // /btake — Remove a user from the event
+    if (i.isChatInputCommand() && i.commandName === 'btake') {
+      await i.deferReply({ ephemeral: true });
+      const target = i.options.getUser('user');
+      const result = takeBalloonTicket(i.guild.id, target.id);
+
+      if (result.error === 'no_event')  return i.editReply({ content: 'No active balloon event.' });
+      if (result.error === 'no_ticket') return i.editReply({ content: `${target} does not have a spot in the active event.` });
+
+      const event = result.event;
+      const eventChannel = i.guild.channels.cache.get(event.channelId) || i.channel;
+
+      await eventChannel.send(
+        `🗑️ <@${target.id}>'s spot has been removed.\n` +
+        `**${event.attendees.length} / ${event.totalTickets}** spots filled — (EVENT ID: ${event.id})`
+      );
+      await i.editReply({ content: `✅ Removed ${target} from the event.` });
+      return;
+    }
+
+    // /bcancel — Cancel the active balloon event
+    if (i.isChatInputCommand() && i.commandName === 'bcancel') {
+      await i.deferReply({ ephemeral: true });
+      const activeEvent = getBalloonEvent(i.guild.id);
+      const title = cancelBalloonEvent(i.guild.id);
+      if (!title) return i.editReply({ content: 'No active balloon event to cancel.' });
+      const eventChannel = (activeEvent && i.guild.channels.cache.get(activeEvent.channelId)) || i.channel;
+      await eventChannel.send(`📢 **${title}** has been canceled.\n❌ Canceled`);
+      await i.editReply({ content: `✅ Balloon event **${title}** has been cancelled.` });
+      return;
+    }
+
+    // /bstatus — Show current event status
+    if (i.isChatInputCommand() && i.commandName === 'bstatus') {
+      await i.deferReply({ ephemeral: true });
+      const event = getBalloonEvent(i.guild.id);
+      if (!event) return i.editReply({ content: 'No active balloon event.' });
+
+      const attendeeLines = event.attendees.length
+        ? event.attendees.map((uid, idx) => `${idx + 1}. <@${uid}>`).join('\n')
+        : '_No spots filled yet._';
+
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setTitle(`🎈 ${event.title} (EVENT ID: ${event.id})`)
+        .addFields(
+          { name: 'Spots Filled',  value: `${event.attendees.length} / ${event.totalTickets}`, inline: true },
+          { name: 'Ticket Price',  value: event.price,                                          inline: true },
+          { name: 'When',          value: event.eventTime,                                      inline: true },
+          { name: 'World',         value: String(event.world),                                  inline: true },
+          { name: 'Items Dropped', value: event.items,                                          inline: false },
+          { name: 'Attendees',     value: attendeeLines,                                        inline: false }
+        )
+        .setTimestamp();
+      await i.editReply({ embeds: [embed] });
+      return;
+    }
+
+    // /bannounce — Post a day-of reminder pinging all ticket holders
+    if (i.isChatInputCommand() && i.commandName === 'bannounce') {
+      await i.deferReply({ ephemeral: true });
+      const event = getBalloonEvent(i.guild.id);
+      if (!event) return i.editReply({ content: 'No active balloon event.' });
+      if (!event.attendees.length) return i.editReply({ content: 'No attendees to announce to yet.' });
+
+      const pings  = event.attendees.map(uid => `<@${uid}>`).join(' ');
+      const itemLines = event.items.split(',').map(s => `• ${s.trim()}`).join('\n');
+      const balloonLine = event.balloons ? `🎈 **${event.balloons} filled balloons**\n` : '';
+
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setTitle(`🎈 ${event.title} — IT'S TIME! 🎈`)
+        .setDescription([
+          `📅 **${event.eventTime}**`,
+          `🌍 **World ${event.world}** — Head to the Clan Hall party room!`,
+          '',
+          balloonLine + `🎁 **What's being dropped:**\n${itemLines}`,
+          '',
+          `🎟️ **${event.attendees.length} / ${event.totalTickets}** spots filled`,
+          '',
+          '**Get in-game and get ready!**'
+        ].join('\n'))
+        .setTimestamp();
+
+      const eventChannel = i.guild.channels.cache.get(event.channelId) || i.channel;
+      await eventChannel.send({ content: `${pings}\n🚨 **Balloon Drop is happening NOW!**`, embeds: [embed] });
+      await i.editReply({ content: '✅ Announcement posted and all ticket holders pinged!' });
+      return;
+    }
+
     // /payment — Payment method instructions
     // ─────────────────────────────────────────────────────────
     if (i.isChatInputCommand() && i.commandName === 'payment') {
@@ -916,6 +1082,70 @@ client.on('interactionCreate', async i => {
 
       const payload = buildSWCalculationPayload(i, { startXP, targetLevel, skill, acctType, rsn });
       await i.editReply(payload);
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Balloon "Buy Ticket" button → opens a support ticket
+    // ─────────────────────────────────────────────────────────
+    if (i.isButton() && i.customId.startsWith('balloon_buy|')) {
+      const eventId = i.customId.split('|')[1];
+      const event   = getBalloonEvent(i.guild.id);
+
+      if (!event || String(event.id) !== eventId) {
+        await i.deferReply({ ephemeral: true });
+        return i.editReply({ content: 'This event is no longer active.' });
+      }
+      if (event.attendees.includes(i.user.id)) {
+        await i.deferReply({ ephemeral: true });
+        return i.editReply({ content: 'You already have a spot in this event!' });
+      }
+      if (event.attendees.length >= event.totalTickets) {
+        await i.deferReply({ ephemeral: true });
+        return i.editReply({ content: 'Sorry — this event is fully booked.' });
+      }
+
+      const existingChannelId = getActiveTicket(i.guild.id, i.user.id);
+      if (existingChannelId) {
+        const existing = i.guild.channels.cache.get(existingChannelId);
+        if (existing) {
+          await i.deferReply({ ephemeral: true });
+          return i.editReply({ content: `You already have an open ticket: ${existing}` });
+        }
+        removeActiveTicketByChannelId(existingChannelId);
+      }
+
+      await i.deferReply({ ephemeral: true });
+
+      const itemLines = event.items.split(',').map(s => `• ${s.trim()}`).join('\n');
+      const balloonLine = event.balloons ? `🎈 **${event.balloons} filled balloons**\n\n` : '';
+
+      const eventInfoEmbed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setAuthor({ name: '🎈 Balloon Drop — Ticket Request', iconURL: LOGO_URL })
+        .setTitle(event.title)
+        .setDescription([
+          `You're securing a spot for **${event.title}**!`,
+          '',
+          `📅 **When:** ${event.eventTime}`,
+          `🌍 **World:** ${event.world}`,
+          `💰 **Price:** ${event.price}`,
+          '',
+          balloonLine + `🎁 **Items Being Dropped:**\n${itemLines}`,
+          '',
+          `🎟️ **${event.attendees.length} / ${event.totalTickets}** spots filled`,
+          '',
+          `Please send payment of **${event.price}** and a staff member will confirm your spot.`
+        ].join('\n'))
+        .setThumbnail(WATERMARK_URL)
+        .setFooter({ text: `EVENT ID: ${event.id}` });
+
+      const ch = await openTicketChannel(i, [eventInfoEmbed], buildCloseRow(i.user.id));
+      addActiveTicket(i.guild.id, i.user.id, ch.id);
+
+      const createdEmbed = buildTicketCreatedEmbed(i, `<#${ch.id}>`);
+      const row = buildTicketEphemeralRow(ch.guild.id, ch.id, i.user.id);
+      await i.editReply({ embeds: [createdEmbed], components: [row] });
       return;
     }
 
