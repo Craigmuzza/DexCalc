@@ -143,7 +143,62 @@ async function deploySlash(client) {
           ))
       .toJSON();
 
-    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks, payment];
+    // ─── Raffle Commands ───
+
+    const raffle = new SlashCommandBuilder()
+      .setName('raffle')
+      .setDescription('Create a new raffle (staff only)')
+      .addStringOption(opt =>
+        opt.setName('title').setDescription('Raffle title').setRequired(true).setMaxLength(80))
+      .addIntegerOption(opt =>
+        opt.setName('tickets').setDescription('Total number of tickets').setRequired(true).setMinValue(1).setMaxValue(500))
+      .addStringOption(opt =>
+        opt.setName('prize1').setDescription('1st place prize').setRequired(true).setMaxLength(100))
+      .addStringOption(opt =>
+        opt.setName('prize2').setDescription('2nd place prize').setRequired(false).setMaxLength(100))
+      .addStringOption(opt =>
+        opt.setName('prize3').setDescription('3rd place prize').setRequired(false).setMaxLength(100))
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const rgive = new SlashCommandBuilder()
+      .setName('rgive')
+      .setDescription('Give raffle tickets to a user (staff only)')
+      .addUserOption(opt =>
+        opt.setName('user').setDescription('User to give tickets to').setRequired(true))
+      .addIntegerOption(opt =>
+        opt.setName('amount').setDescription('Number of tickets').setRequired(true).setMinValue(1).setMaxValue(100))
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const rtake = new SlashCommandBuilder()
+      .setName('rtake')
+      .setDescription('Remove raffle tickets from a user (staff only)')
+      .addUserOption(opt =>
+        opt.setName('user').setDescription('User to remove tickets from').setRequired(true))
+      .addIntegerOption(opt =>
+        opt.setName('amount').setDescription('Number of tickets to remove').setRequired(true).setMinValue(1).setMaxValue(100))
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const rcancel = new SlashCommandBuilder()
+      .setName('rcancel')
+      .setDescription('Cancel the active raffle (staff only)')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const rroll = new SlashCommandBuilder()
+      .setName('rroll')
+      .setDescription('Force roll the active raffle now (staff only)')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
+    const rstatus = new SlashCommandBuilder()
+      .setName('rstatus')
+      .setDescription('Show the current raffle status')
+      .toJSON();
+
+    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks, payment, raffle, rgive, rtake, rcancel, rroll, rstatus];
 
     console.log(`[deploy] GUILD_IDS: ${GUILD_IDS.join(', ') || '(none — global)'}`);
 
