@@ -198,6 +198,12 @@ async function deploySlash(client) {
       .setDescription('Show the current raffle status')
       .toJSON();
 
+    const rannounce = new SlashCommandBuilder()
+      .setName('rannounce')
+      .setDescription('Post a reminder pinging all raffle ticket holders (staff only)')
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .toJSON();
+
     // ─── Balloon Drop Commands ───
 
     const balloon = new SlashCommandBuilder()
@@ -253,7 +259,7 @@ async function deploySlash(client) {
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
       .toJSON();
 
-    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks, payment, raffle, rgive, rtake, rcancel, rroll, rstatus, balloon, bgive, btake, bcancel, bstatus, bannounce];
+    const commands = [swCalc, swQuote, paid, refund, customer, totalSpent, leaderboard, revenue, syncranks, payment, raffle, rgive, rtake, rcancel, rroll, rstatus, rannounce, balloon, bgive, btake, bcancel, bstatus, bannounce];
 
     console.log(`[deploy] GUILD_IDS: ${GUILD_IDS.join(', ') || '(none — global)'}`);
 

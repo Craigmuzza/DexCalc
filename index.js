@@ -797,6 +797,37 @@ client.on('interactionCreate', async i => {
       return;
     }
 
+    // /rannounce — Ping all raffle ticket holders with a reminder
+    if (i.isChatInputCommand() && i.commandName === 'rannounce') {
+      await i.deferReply({ ephemeral: true });
+      const raffle = getRaffle(i.guild.id);
+      if (!raffle) return i.editReply({ content: 'No active raffle.' });
+
+      const holderIds = Object.keys(raffle.tickets);
+      if (!holderIds.length) return i.editReply({ content: 'No ticket holders to announce to yet.' });
+
+      const pings      = holderIds.map(uid => `<@${uid}>`).join(' ');
+      const ordinals   = ['1st', '2nd', '3rd'];
+      const prizeLines = raffle.prizes.map((p, idx) => `( ${ordinals[idx] || `${idx + 1}th`} ) ➛ ${p}`).join('\n');
+
+      const embed = new EmbedBuilder()
+        .setColor(THEME_COLOR)
+        .setTitle(`🎟️ ${raffle.title} — Raffle Update`)
+        .setDescription([
+          `🎁 **Prizes:**\n${prizeLines}`,
+          '',
+          `🎟️ **${raffle.soldCount} / ${raffle.totalTickets}** tickets sold`,
+          '',
+          `*(RAFFLE ID: ${raffle.id})*`
+        ].join('\n'))
+        .setTimestamp();
+
+      const raffleChannel = i.guild.channels.cache.get(raffle.channelId) || i.channel;
+      await raffleChannel.send({ content: `${pings}\n🚨 **Raffle reminder!**`, embeds: [embed] });
+      await i.editReply({ content: '✅ Announcement posted and all ticket holders pinged!' });
+      return;
+    }
+
     // ─────────────────────────────────────────────────────────
     // Balloon Drop Commands
     // ─────────────────────────────────────────────────────────
